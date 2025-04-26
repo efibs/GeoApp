@@ -6,14 +6,14 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GeoAppAPI.Controllers;
 
-[Authorize]
 [ApiController]
-[Route("/api/data")]
+[Route("/api/data/{userId}")]
 public class DataController(ILogger<DataController> logger, InfluxDBClient influxDbClient)
     : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Data>>> Get()
+    [Authorize(Permissions.ReadData)]
+    public async Task<ActionResult<IEnumerable<Data>>> Get(Guid userId)
     {
         var query = influxDbClient.GetQueryApi();
 
@@ -27,7 +27,8 @@ public class DataController(ILogger<DataController> logger, InfluxDBClient influ
     }
 
     [HttpPut]
-    public async Task<IActionResult> Put(Data data)
+    [Authorize(Permissions.WriteData)]
+    public async Task<IActionResult> Put(Guid userId, Data data)
     {
         var write = influxDbClient.GetWriteApiAsync();
 

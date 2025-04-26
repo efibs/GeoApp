@@ -1,8 +1,10 @@
 using System.Text;
+using GeoAppAPI.Auth;
 using GeoAppAPI.Controllers;
 using GeoAppAPI.Models;
 using InfluxDB.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -39,6 +41,16 @@ builder.Services.AddSwaggerGen(options =>
             []
         }
     });
+});
+
+builder.Services.AddScoped<IAuthorizationHandler, PermissionRequirementHandler>();
+
+builder.Services.AddAuthorization(options =>
+{
+    foreach (var permission in Permissions.AvailablePermissions)
+    {
+        options.AddPolicy(permission, policy => policy.AddRequirements(new PermissionRequirement(permission)));
+    }
 });
 
 var influxDbHost = builder.Configuration.GetValue<string>("InfluxDB:Host")!;

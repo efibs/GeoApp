@@ -1,7 +1,9 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using GeoAppAPI.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -32,10 +34,10 @@ public class UserController(IConfiguration config, UserManager<User> userManager
         {
             return StatusCode(500);
         }
-        
-        var token = _generateJSONWebToken(createdUser, true);
-        
-        return Ok(new JwtToken{Token = token});
+
+        var token = _generateJSONWebToken(createdUser, TimeSpan.FromHours(2), Permissions.All);
+
+        return Ok(new JwtToken { Token = token });
     }
 
     [HttpPost]
@@ -48,38 +50,72 @@ public class UserController(IConfiguration config, UserManager<User> userManager
         {
             return Unauthorized();
         }
-        
+
         var passwordValid = await userManager.CheckPasswordAsync(user, login.Password).ConfigureAwait(false);
 
         if (!passwordValid)
         {
             return Unauthorized();
         }
-        
-        var token = _generateJSONWebToken(user, true);
-        
-        return Ok(new JwtToken{Token = token});
+
+        var token = _generateJSONWebToken(user, TimeSpan.FromHours(2), Permissions.All);
+
+        return Ok(new JwtToken { Token = token });
     }
-    
-    private string _generateJSONWebToken(User userInfo, bool fullAccess)
+
+    [HttpPost]
+    [Route("{userId}/tokens")]
+    [Authorize(Permissions.GenerateToken)]
+    public async Task<ActionResult<JwtToken>> GenerateToken(Guid userId, GenerateToken generateToken)
+    {
+        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userIdString))
+        {
+            return Unauthorized();
+        }
+
+        var claimUserId = Guid.Parse(userIdString);
+
+        if (claimUserId != userId)
+        {
+            return Unauthorized();
+        }
+
+        var user = await userManager.FindByIdAsync(userIdString).ConfigureAwait(false);
+
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        if (generateToken.Permissions.Any(p => p is Permissions.All or Permissions.GenerateToken) ||
+            generateToken.Expiry > TimeSpan.FromDays(365))
+        {
+            return BadRequest();
+        }
+
+        var token = _generateJSONWebToken(user, generateToken.Expiry, generateToken.Permissions);
+
+        return Ok(new JwtToken { Token = token });
+    }
+
+    private string _generateJSONWebToken(User userInfo, TimeSpan expiry, params string[] permissions)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        var claims = new List<Claim>();
-
-        claims.Add(new Claim(ClaimTypes.Name, userInfo.UserName!));
-        claims.Add(new Claim(ClaimTypes.NameIdentifier, userInfo.Id));
-        
-        if (fullAccess)
+        var claims = new List<Claim>
         {
-            claims.Add(new Claim("FullAccess", "true"));
-        }
-        
+            new Claim(ClaimTypes.Name, userInfo.UserName!),
+            new Claim(ClaimTypes.NameIdentifier, userInfo.Id),
+            new Claim(Permissions.PermissionClaimType, JsonSerializer.Serialize(permissions))
+        };
+
         var token = new JwtSecurityToken(config["Jwt:Issuer"],
             config["Jwt:Issuer"],
             claims,
-            expires: DateTime.Now.AddMinutes(120),
+            expires: DateTime.Now.Add(expiry),
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
