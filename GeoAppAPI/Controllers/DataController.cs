@@ -6,9 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GeoAppAPI.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("/api/data")]
-[Authorize]
 public class DataController(ILogger<DataController> logger, InfluxDBClient influxDbClient)
     : ControllerBase
 {
