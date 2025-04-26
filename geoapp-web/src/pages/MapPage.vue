@@ -5,9 +5,16 @@ import * as am5map from '@amcharts/amcharts5/map';
 import am5themes_Animated from '@amcharts/amcharts5/themes/Animated';
 import am5geodata_worldUltra from '@amcharts/amcharts5-geodata/worldUltra';
 import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
+import { useQuasar } from 'quasar';
+import { api } from 'boot/axios';
+import { type Datapoint } from 'src/components/models';
 
+const quasar = useQuasar();
 const mapDiv = useTemplateRef('the-map');
+
 let root: am5.Root;
+
+quasar.loading.show({ delay: 400 });
 
 onMounted(() => {
   root = am5.Root.new(mapDiv.value!);
@@ -23,6 +30,37 @@ onMounted(() => {
   );
 
   chart.series.push(am5map.MapPolygonSeries.new(root, { geoJSON: am5geodata_worldUltra }));
+
+  api
+    .get<Datapoint[]>('/data')
+    .then((data) => {
+      const pointSeries = chart.series.push(
+        am5map.MapPointSeries.new(root, {
+          latitudeField: 'lat',
+          longitudeField: 'long',
+        }),
+      );
+
+      pointSeries.bullets.push(function () {
+        return am5.Bullet.new(root, {
+          sprite: am5.Circle.new(root, {
+            radius: 3,
+            fill: am5.color(0xff0000),
+          }),
+        });
+      });
+
+      const mapPoints = data.data.map((datapoint) => {
+        return {
+          lat: datapoint.latitude,
+          long: datapoint.longitude,
+        };
+      });
+
+      pointSeries.data.setAll(mapPoints);
+    })
+    .catch((err) => console.error(err))
+    .finally(() => quasar.loading.hide());
 });
 
 onBeforeUnmount(() => {

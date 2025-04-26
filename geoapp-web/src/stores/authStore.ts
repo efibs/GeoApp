@@ -26,11 +26,19 @@ export const useAuthStore = defineStore('auth', () => {
     return expiry > now;
   };
 
+  const setTokenOnAxios = () => {
+    api.defaults.headers.common.Authorization = `Bearer ${tokenString.value}`;
+  };
+
   const signInAsync = async (login: Login) => {
     const response = await api.post('/users/login', login);
     tokenString.value = response.data.token;
-    api.defaults.headers.common.Authorization = `Bearer: ${tokenString.value}`;
+    setTokenOnAxios();
   };
+
+  if (isSignedIn()) {
+    setTokenOnAxios();
+  }
 
   return {
     jwtToken,

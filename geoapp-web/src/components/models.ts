@@ -11,3 +11,9 @@ export interface Login {
   username: string;
   password: string;
 }
+
+export interface Datapoint {
+  latitude: number;
+  longitude: number;
+  timestamp: Date;
+}
