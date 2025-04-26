@@ -40,11 +40,8 @@ import { type ValidationRule } from 'quasar';
 import { type Login } from 'src/components/models';
 import { ref } from 'vue';
 import { useAuthStore } from 'src/stores/authStore';
-import { api } from 'boot/axios';
-import { useRouter } from 'vue-router';
 import { usePopupTimer } from 'src/composables/popupTimer';
 
-const router = useRouter();
 const authStore = useAuthStore();
 const { popupShowing: errorShowing, showPopup: showError } = usePopupTimer(3000);
 
@@ -66,11 +63,7 @@ const login = async () => {
   };
 
   try {
-    const response = await api.post('/users/login', login);
-
-    authStore.tokenString = response.data.token;
-
-    await router.push('/');
+    await authStore.signInAsync(login);
   } catch (error) {
     console.error(error);
     showError();

@@ -37,7 +37,7 @@ export default defineRouter(function (/* { store, ssrContext } */) {
   });
 
   Router.beforeEach((to, from, next) => {
-    if (to.matched.some((record) => record.meta.requiresAuth) && !authStore.isSignedIn) {
+    if (to.matched.some((record) => record.meta.requiresAuth) && !authStore.isSignedIn()) {
       next({ name: 'account-signin' });
     } else {
       next();
