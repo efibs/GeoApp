@@ -30,7 +30,7 @@
     </q-card>
 
     <div class="q-pa-md q-gutter-sm">
-      <q-banner v-if="!noError" class="text-white bg-red"> Login failed </q-banner>
+      <q-banner v-if="errorShowing" class="text-white bg-red"> Login failed </q-banner>
     </div>
   </div>
 </template>
@@ -40,13 +40,13 @@ import { type ValidationRule } from 'quasar';
 import { type Login } from 'src/components/models';
 import { ref } from 'vue';
 import { useAuthStore } from 'src/stores/authStore';
-import { useTimeout } from '@vueuse/core';
 import { api } from 'boot/axios';
 import { useRouter } from 'vue-router';
+import { usePopupTimer } from 'src/composables/popupTimer';
 
 const router = useRouter();
 const authStore = useAuthStore();
-const { ready: noError, start } = useTimeout(3000, { controls: true });
+const { popupShowing: errorShowing, showPopup: showError } = usePopupTimer(3000);
 
 const username = ref();
 const password = ref();
@@ -73,9 +73,7 @@ const login = async () => {
     await router.push('/');
   } catch (error) {
     console.error(error);
-    if (noError) {
-      start();
-    }
+    showError();
   }
 };
 </script>
