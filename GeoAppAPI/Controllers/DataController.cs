@@ -1,12 +1,14 @@
 using GeoAppAPI.Models;
 using InfluxDB.Client;
 using InfluxDB.Client.Linq;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GeoAppAPI.Controllers;
 
 [ApiController]
 [Route("/api/data")]
+[Authorize]
 public class DataController(ILogger<DataController> logger, InfluxDBClient influxDbClient)
     : ControllerBase
 {
@@ -18,7 +20,8 @@ public class DataController(ILogger<DataController> logger, InfluxDBClient influ
         var results = await InfluxDBQueryable<Data>
             .Queryable(bucket: "GeoApp", "docs", query)
             .GetAsyncEnumerator()
-            .ToListAsync();
+            .ToListAsync()
+            .ConfigureAwait(false);
         
         return Ok(results);
     }
