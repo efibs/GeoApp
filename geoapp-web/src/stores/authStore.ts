@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
 import { useJwt } from '@vueuse/integrations/useJwt';
 import { type Login } from 'src/components/models';
 import { api } from 'boot/axios';
+import { useLocalStorage } from '@vueuse/core';
 
 export const useAuthStore = defineStore('auth', () => {
-  const tokenString = ref<string>('');
+  const tokenString = useLocalStorage('jwt-token', '');
   const jwtToken = useJwt(tokenString);
 
   const isSignedIn = () => {
