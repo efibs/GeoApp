@@ -1,5 +1,5 @@
 <template>
-  <q-layout view="hHh lpR fFf">
+  <q-layout view="hHh lpR fFf" style="display: flex; width: 100vw; height: 100vh">
     <q-header elevated class="bg-primary text-white">
       <q-toolbar>
         <q-btn dense flat round icon="menu" @click="toggleLeftDrawer" />
@@ -15,6 +15,8 @@
 
     <q-drawer v-model="leftDrawerOpen" side="left" overlay elevated>
       <!-- drawer content -->
+      <EssentialLink title="Home" icon="home" route="/" />
+      <EssentialLink title="Map" caption="Your map" icon="map" route="/map" />
     </q-drawer>
 
     <q-page-container>
@@ -24,6 +26,7 @@
 </template>
 
 <script lang="ts" setup>
+import EssentialLink from 'src/components/common/EssentialLink.vue';
 import { ref } from 'vue';
 
 const leftDrawerOpen = ref(false);
