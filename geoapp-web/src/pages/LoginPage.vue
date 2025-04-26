@@ -94,6 +94,7 @@ const login = async () => {
   left: 50%;
   -ms-transform: translate(-50%, -50%);
   transform: translate(-50%, -50%);
+  filter: drop-shadow(7px 7px 5px rgba(0, 0, 0, 0.6));
 }
 
 .login-button {
