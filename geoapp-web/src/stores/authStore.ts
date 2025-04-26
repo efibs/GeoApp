@@ -1,14 +1,12 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useJwt } from '@vueuse/integrations/useJwt';
-import { useRouter } from 'vue-router';
 import { type Login } from 'src/components/models';
 import { api } from 'boot/axios';
 
 export const useAuthStore = defineStore('auth', () => {
   const tokenString = ref<string>('');
   const jwtToken = useJwt(tokenString);
-  const router = useRouter();
 
   const isSignedIn = () => {
     if (!(tokenString.value && tokenString.value.length > 0)) {
@@ -21,7 +19,8 @@ export const useAuthStore = defineStore('auth', () => {
       return false;
     }
 
-    const expiry = new Date(expirationNum);
+    const expiry = new Date(0);
+    expiry.setUTCSeconds(expirationNum);
     const now = new Date();
 
     return expiry > now;
@@ -30,7 +29,7 @@ export const useAuthStore = defineStore('auth', () => {
   const signInAsync = async (login: Login) => {
     const response = await api.post('/users/login', login);
     tokenString.value = response.data.token;
-    await router.push('/');
+    api.defaults.headers.common.Authorization = `Bearer: ${tokenString.value}`;
   };
 
   return {

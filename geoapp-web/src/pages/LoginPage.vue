@@ -41,7 +41,9 @@ import { type Login } from 'src/components/models';
 import { ref } from 'vue';
 import { useAuthStore } from 'src/stores/authStore';
 import { usePopupTimer } from 'src/composables/popupTimer';
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const authStore = useAuthStore();
 const { popupShowing: errorShowing, showPopup: showError } = usePopupTimer(3000);
 
@@ -64,6 +66,7 @@ const login = async () => {
 
   try {
     await authStore.signInAsync(login);
+    await router.push('/');
   } catch (error) {
     console.error(error);
     showError();
