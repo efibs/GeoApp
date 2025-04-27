@@ -18,7 +18,7 @@ class DataRepository private constructor() {
         _frequency.postValue(freq)
     }
 
-    val bufferSize = 20//100000
+    val bufferSize = 100000
     private val _currentBufferSize = MutableLiveData(0)
     val currentBufferSize: LiveData<Int> = _currentBufferSize
 
