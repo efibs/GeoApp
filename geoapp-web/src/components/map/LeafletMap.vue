@@ -25,12 +25,13 @@ import { api } from 'boot/axios';
 import { type Datapoint } from '../models';
 import { useQuasar } from 'quasar';
 import { useAuthStore } from 'src/stores/authStore';
+import { useLocalStorage } from '@vueuse/core';
 
 const quasar = useQuasar();
 const { userId } = useAuthStore();
 
-const zoom = ref(2);
-const center = ref([0, 0]);
+const zoom = useLocalStorage('map-zoom', 2);
+const center = useLocalStorage('map-center', { lat: 0, lng: 0 });
 const measurements = ref<Datapoint[]>([]);
 
 quasar.loading.show({ delay: 400 });
