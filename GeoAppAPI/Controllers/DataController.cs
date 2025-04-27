@@ -29,6 +29,8 @@ public class DataController(ILogger<DataController> logger, InfluxService influx
             return Unauthorized();
         }
         
+        logger.LogDebug("New data received");
+        
         var results = await influxService.QueryAsync(claimUserIdString).ConfigureAwait(false);
         
         return Ok(results);
