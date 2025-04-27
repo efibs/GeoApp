@@ -10,6 +10,9 @@ public class Data
     
     [Column("Longitude")] 
     public double Longitude { get; set; }
+
+    [Column("Steps")]
+    public int Steps { get; set; }
     
     [Column(IsTimestamp = true)] 
     public DateTime Timestamp { get; set; }

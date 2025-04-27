@@ -68,21 +68,21 @@ public class UserController(IConfiguration config, UserManager<User> userManager
     [Authorize(Permissions.GenerateToken)]
     public async Task<ActionResult<JwtToken>> GenerateToken(Guid userId, GenerateToken generateToken)
     {
-        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var claimUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-        if (string.IsNullOrWhiteSpace(userIdString))
+        if (string.IsNullOrWhiteSpace(claimUserIdString))
         {
             return Unauthorized();
         }
 
-        var claimUserId = Guid.Parse(userIdString);
+        var claimUserId = Guid.Parse(claimUserIdString);
 
         if (claimUserId != userId)
         {
             return Unauthorized();
         }
 
-        var user = await userManager.FindByIdAsync(userIdString).ConfigureAwait(false);
+        var user = await userManager.FindByIdAsync(claimUserIdString).ConfigureAwait(false);
 
         if (user == null)
         {

@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using GeoAppAPI.Models;
+using GeoAppAPI.Services;
 using InfluxDB.Client;
 using InfluxDB.Client.Linq;
 using Microsoft.AspNetCore.Authorization;
@@ -8,31 +10,47 @@ namespace GeoAppAPI.Controllers;
 
 [ApiController]
 [Route("/api/data/{userId}")]
-public class DataController(ILogger<DataController> logger, InfluxDBClient influxDbClient)
+public class DataController(ILogger<DataController> logger, InfluxService influxService)
     : ControllerBase
 {
     [HttpGet]
     [Authorize(Permissions.ReadData)]
     public async Task<ActionResult<IEnumerable<Data>>> Get(Guid userId)
     {
-        var query = influxDbClient.GetQueryApi();
+        var claimUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(claimUserIdString))
+        {
+            return Unauthorized();
+        }
 
-        var results = await InfluxDBQueryable<Data>
-            .Queryable(bucket: "GeoApp", "docs", query)
-            .GetAsyncEnumerator()
-            .ToListAsync()
-            .ConfigureAwait(false);
+        var claimUserId = Guid.Parse(claimUserIdString);
+        if (claimUserId != userId)
+        {
+            return Unauthorized();
+        }
+        
+        var results = await influxService.QueryAsync(claimUserIdString).ConfigureAwait(false);
         
         return Ok(results);
     }
-
+    
     [HttpPut]
     [Authorize(Permissions.WriteData)]
-    public async Task<IActionResult> Put(Guid userId, Data data)
+    public async Task<IActionResult> Put(Guid userId, IEnumerable<Data> data)
     {
-        var write = influxDbClient.GetWriteApiAsync();
+        var claimUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(claimUserIdString))
+        {
+            return Unauthorized();
+        }
 
-        await write.WriteMeasurementAsync(data, bucket: "GeoApp", org: "docs").ConfigureAwait(false);
+        var claimUserId = Guid.Parse(claimUserIdString);
+        if (claimUserId != userId)
+        {
+            return Unauthorized();
+        }
+        
+        await influxService.WriteAsync(claimUserIdString, data).ConfigureAwait(false);
 
         return Ok();
     }

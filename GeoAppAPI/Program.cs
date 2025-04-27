@@ -2,6 +2,7 @@ using System.Text;
 using GeoAppAPI.Auth;
 using GeoAppAPI.Controllers;
 using GeoAppAPI.Models;
+using GeoAppAPI.Services;
 using InfluxDB.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -56,6 +57,8 @@ builder.Services.AddAuthorization(options =>
 var influxDbHost = builder.Configuration.GetValue<string>("InfluxDB:Host")!;
 var influxDbToken = builder.Configuration.GetValue<string>("InfluxDB:Token")!;
 builder.Services.AddTransient(_ => new InfluxDBClient(influxDbHost, influxDbToken));
+
+builder.Services.AddTransient<InfluxService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
