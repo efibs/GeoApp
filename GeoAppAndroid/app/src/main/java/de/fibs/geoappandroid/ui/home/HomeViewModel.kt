@@ -1,34 +1,39 @@
 package de.fibs.geoappandroid.ui.home
 
-import android.os.Handler
-import android.os.Looper
 import androidx.databinding.BaseObservable
 import androidx.databinding.Bindable
 import de.fibs.geoappandroid.BR
+import de.fibs.geoappandroid.repo.DataRepository
 
 
 class HomeViewModel : BaseObservable() {
 
+    private val repo = DataRepository.getInstance()
+
     @get:Bindable
-    val text: String
+    val collectingText: String
         get() {
-            val collecting = _collecting
+            val collecting = repo.collecting.value ?: false
             return if (collecting) "Collecting data" else "Collection stopped"
         }
 
-    private var _collecting = false
-
     @get:Bindable
     var collecting: Boolean
-        get() = _collecting
+        get() = repo.collecting.value ?: false
         set(value) {
-            _collecting = value
-            notifyPropertyChanged(BR.text)
+            repo.setCollecting(value)
+            notifyPropertyChanged(BR.collectingText)
             notifyPropertyChanged(BR.collecting)
+        }
 
-            val handler = Handler(Looper.getMainLooper())
-            handler.postDelayed({
-                collecting = !collecting
-            }, 2000L)
+    @get:Bindable
+    var frequency: String
+        get() = (repo.frequency.value ?: 60).toString()
+        set(value) {
+            if (value.isEmpty()) {
+                return;
+            }
+            repo.setFrequency(value.toLong())
+            notifyPropertyChanged(BR.frequency)
         }
 }

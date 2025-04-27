@@ -7,43 +7,37 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
-import android.location.LocationManager
-import android.location.LocationRequest
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import androidx.annotation.RequiresPermission
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import de.fibs.geoappandroid.R
 import de.fibs.geoappandroid.models.Datapoint
+import de.fibs.geoappandroid.repo.DataRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.json.JSONObject
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.time.LocalDateTime
 import java.time.OffsetDateTime
 
 class LocationStepService : Service(), SensorEventListener {
 
+    private val repo = DataRepository.getInstance()
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var sensorManager: SensorManager
     private var stepSensor: Sensor? = null
@@ -137,8 +131,10 @@ class LocationStepService : Service(), SensorEventListener {
         handler.postDelayed(object : Runnable {
             @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
             override fun run() {
-                onUpdate()
-                handler.postDelayed(this, 60 * 1000) // Repeat every minute
+                if (repo.collecting.value == true) {
+                    onUpdate()
+                }
+                handler.postDelayed(this, (repo.frequency.value ?: 60) * 1000) // Repeat
             }
         }, 1000)
     }

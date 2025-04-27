@@ -58,4 +58,6 @@ dependencies {
     implementation(libs.androidx.databinding.runtime)
     kapt(libs.androidx.databinding.runtime)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.room.runtime)
+    kapt(libs.androidx.room.compiler)
 }
