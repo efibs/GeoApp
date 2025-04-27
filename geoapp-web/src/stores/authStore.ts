@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { useJwt } from '@vueuse/integrations/useJwt';
-import { ClaimTypeUserId, type Login } from 'src/components/models';
+import { ClaimTypeUserId, ClaimTypeUsername, type Login } from 'src/components/models';
 import { api } from 'boot/axios';
 import { useLocalStorage } from '@vueuse/core';
 import { computed } from 'vue';
@@ -37,6 +37,11 @@ export const useAuthStore = defineStore('auth', () => {
     setTokenOnAxios();
   };
 
+  const logout = () => {
+    tokenString.value = '';
+    setTokenOnAxios();
+  };
+
   if (isSignedIn()) {
     setTokenOnAxios();
   }
@@ -53,10 +58,24 @@ export const useAuthStore = defineStore('auth', () => {
     return payloadAny[ClaimTypeUserId] as string;
   });
 
+  const username = computed(() => {
+    const jwtPayload = jwtToken.payload.value;
+
+    if (jwtPayload == null) {
+      return null;
+    }
+
+    const payloadAny = jwtPayload as never;
+
+    return payloadAny[ClaimTypeUsername] as string;
+  });
+
   return {
     jwtToken,
     isSignedIn,
     signInAsync,
+    logout,
     userId,
+    username,
   };
 });

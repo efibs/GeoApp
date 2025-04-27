@@ -10,6 +10,29 @@
           </q-avatar>
           GeoApp
         </q-toolbar-title>
+
+        <q-space />
+        <q-btn flat class="user-btn" round>
+          <q-avatar color="primary" icon="person" />
+          <q-menu>
+            <div class="row no-wrap q-pa-md">
+              <div class="column items-center">
+                <q-avatar size="72px" icon="person"> </q-avatar>
+
+                <div class="text-subtitle1 q-mt-md q-mb-xs">{{ username }}</div>
+
+                <q-btn
+                  @click="userLogout"
+                  color="primary"
+                  label="Logout"
+                  push
+                  size="sm"
+                  v-close-popup
+                />
+              </div>
+            </div>
+          </q-menu>
+        </q-btn>
       </q-toolbar>
     </q-header>
 
@@ -33,12 +56,22 @@
 
 <script lang="ts" setup>
 import EssentialLink from 'src/components/common/EssentialLink.vue';
+import { useAuthStore } from 'src/stores/authStore';
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
+const { username, logout } = useAuthStore();
 
 const leftDrawerOpen = ref(false);
 
 const toggleLeftDrawer = () => {
   leftDrawerOpen.value = !leftDrawerOpen.value;
+};
+
+const userLogout = async () => {
+  logout();
+  await router.push('/login');
 };
 </script>
 

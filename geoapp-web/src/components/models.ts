@@ -26,6 +26,8 @@ export interface GenerateToken {
 
 export const ClaimTypeUserId: string =
   'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier';
+export const ClaimTypeUsername: string =
+  'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name';
 
 export const PermissionReadData: string = 'perm:ReadData';
 
