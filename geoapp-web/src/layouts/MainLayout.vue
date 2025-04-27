@@ -48,7 +48,7 @@
       />
     </q-drawer>
 
-    <q-page-container>
+    <q-page-container class="page">
       <router-view />
     </q-page-container>
   </q-layout>
@@ -90,5 +90,11 @@ const userLogout = async () => {
   background-repeat: no-repeat;
   background-size: cover;
   display: flex;
+}
+
+.page {
+  display: flex;
+  width: 100%;
+  height: 100%;
 }
 </style>
