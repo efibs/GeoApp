@@ -8,9 +8,11 @@ import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
 import { useQuasar } from 'quasar';
 import { api } from 'boot/axios';
 import { type Datapoint } from 'src/components/models';
+import { useAuthStore } from 'src/stores/authStore';
 
 const quasar = useQuasar();
 const mapDiv = useTemplateRef('the-map');
+const { userId } = useAuthStore();
 
 let root: am5.Root;
 
@@ -32,7 +34,7 @@ onMounted(() => {
   chart.series.push(am5map.MapPolygonSeries.new(root, { geoJSON: am5geodata_worldUltra }));
 
   api
-    .get<Datapoint[]>('/data')
+    .get<Datapoint[]>(`/data/${userId}`)
     .then((data) => {
       const pointSeries = chart.series.push(
         am5map.MapPointSeries.new(root, {

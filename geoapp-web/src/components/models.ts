@@ -15,6 +15,7 @@ export interface Login {
 export interface Datapoint {
   latitude: number;
   longitude: number;
+  steps: number;
   timestamp: string;
 }
 

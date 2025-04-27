@@ -24,8 +24,10 @@ import { ref } from 'vue';
 import { api } from 'boot/axios';
 import { type Datapoint } from '../models';
 import { useQuasar } from 'quasar';
+import { useAuthStore } from 'src/stores/authStore';
 
 const quasar = useQuasar();
+const { userId } = useAuthStore();
 
 const zoom = ref(2);
 const center = ref([0, 0]);
@@ -33,7 +35,7 @@ const measurements = ref<Datapoint[]>([]);
 
 quasar.loading.show({ delay: 400 });
 api
-  .get<Datapoint[]>('/data')
+  .get<Datapoint[]>(`/data/${userId}`)
   .then((data) => {
     measurements.value = data.data;
   })
