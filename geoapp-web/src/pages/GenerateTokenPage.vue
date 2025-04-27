@@ -10,7 +10,10 @@
         <q-checkbox v-model="hasReadDataPermission">Read Data</q-checkbox>
         <q-checkbox v-model="hasWriteDataPermission">Write Data</q-checkbox>
       </q-scroll-area>
-      <q-input v-model="tokenExpiryString" filled label="Expiry" style="margin-bottom: 10px" />
+
+      <q-input v-model="tokenExpiryString" filled label="Expiry" style="margin-bottom: 10px">
+        <q-tooltip anchor="top left" self="center left"> dd.HH:mm:ss </q-tooltip>
+      </q-input>
       <q-btn @click="generateToken" color="primary" class="gen-btn">Generate</q-btn>
     </q-card-section>
   </q-card>

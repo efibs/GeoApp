@@ -1,5 +1,5 @@
 <template>
-  <q-layout view="hHh lpR fFf" style="display: flex; width: 100vw; height: 100vh">
+  <q-layout class="layout" view="hHh lpR fFf">
     <q-header elevated class="bg-primary text-white">
       <q-toolbar>
         <q-btn dense flat round icon="menu" @click="toggleLeftDrawer" />
@@ -47,5 +47,15 @@ const toggleLeftDrawer = () => {
   position: fixed;
   z-index: 999999;
   margin: 10px;
+}
+
+.layout {
+  width: 100vw;
+  height: 100vh;
+  background-image: url('../assets/earth_11px.webp');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  display: flex;
 }
 </style>
