@@ -1,24 +1,34 @@
 package de.fibs.geoappandroid.ui.home
 
+import android.os.Handler
+import android.os.Looper
+import androidx.databinding.BaseObservable
 import androidx.databinding.Bindable
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
+import de.fibs.geoappandroid.BR
 
-class HomeViewModel : ViewModel() {
 
-    val text = MutableLiveData("This is home Fragment")
+class HomeViewModel : BaseObservable() {
 
-    private val _collecting = MutableLiveData(false)
+    @get:Bindable
+    val text: String
+        get() {
+            val collecting = _collecting
+            return if (collecting) "Collecting data" else "Collection stopped"
+        }
+
+    private var _collecting = false
 
     @get:Bindable
     var collecting: Boolean
-        get() = _collecting.value ?: false
+        get() = _collecting
         set(value) {
-            _collecting.value = value
-            if (value) {
-                text.value = "Enabled"
-            } else {
-                text.value = "Disabled"
-            }
+            _collecting = value
+            notifyPropertyChanged(BR.text)
+            notifyPropertyChanged(BR.collecting)
+
+            val handler = Handler(Looper.getMainLooper())
+            handler.postDelayed({
+                collecting = !collecting
+            }, 2000L)
         }
 }
