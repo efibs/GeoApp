@@ -17,6 +17,12 @@
       <!-- drawer content -->
       <EssentialLink title="Home" icon="home" route="/" />
       <EssentialLink title="Map" caption="Your map" icon="map" route="/map" />
+      <EssentialLink
+        title="Generate token"
+        caption="Generate tokens to access the API"
+        icon="key"
+        route="/generate-token"
+      />
     </q-drawer>
 
     <q-page-container>

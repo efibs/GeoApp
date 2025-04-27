@@ -19,6 +19,13 @@ const routes: RouteRecordRaw[] = [
       { path: '', name: 'account-signin', component: () => import('pages/LoginPage.vue') },
     ],
   },
+  {
+    path: '/generate-token',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [
+      { path: '', name: 'generate-token', component: () => import('pages/GenerateTokenPage.vue') },
+    ],
+  },
 
   // Always leave this as last one,
   // but you can also remove it
