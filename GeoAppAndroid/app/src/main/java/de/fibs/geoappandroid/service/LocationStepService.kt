@@ -4,24 +4,22 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.Service
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
-import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresPermission
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.LifecycleService
 import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
 import de.fibs.geoappandroid.R
 import de.fibs.geoappandroid.models.Datapoint
 import de.fibs.geoappandroid.repo.DataRepository
@@ -31,7 +29,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -40,21 +37,24 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.OffsetDateTime
 
-class LocationStepService : Service(), SensorEventListener {
+class LocationStepService : LifecycleService(), SensorEventListener {
 
     private val repo = DataRepository.getInstance()
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationCallback: LocationCallback
     private lateinit var sensorManager: SensorManager
     private var stepSensor: Sensor? = null
     private var lastStepCount: Int? = null
     private var lastLocation: Location? = null
     private val job = SupervisorJob()
     private val scope = CoroutineScope(Dispatchers.Main + job)
+    private val dataQueue: ArrayList<Datapoint> = ArrayList(repo.bufferSize)
 
+    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     override fun onCreate() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
         // Start foreground service
@@ -66,43 +66,46 @@ class LocationStepService : Service(), SensorEventListener {
             sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
         }
 
+        locationCallback = object: LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                onLocationChanged(locationResult)
+            }
+        }
+
+        // Start the location updates
+        startLocationUpdates()
+
+        repo.frequency.observe(this) { stopLocationUpdates(); startLocationUpdates() }
+
         // Schedule location and step count updates every minute
         scheduleUpdates()
     }
 
-    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
-    private fun onUpdate() {
-        fusedLocationClient
-            .getCurrentLocation(
-                Priority.PRIORITY_HIGH_ACCURACY,
-                CancellationTokenSource().token
-            ).addOnCompleteListener { task ->
-                if (task.isSuccessful && task.result != null) {
-                    lastLocation = task.result
-                }
+    private fun putDatapointOnQueue() {
+        val now = OffsetDateTime.now()
+        val datapoint = Datapoint(
+            lastLocation?.latitude ?: -1.0,
+            lastLocation?.longitude ?: -1.0,
+            lastStepCount ?: -1,
+            now.toString()
+        )
+        dataQueue.add(datapoint)
+        repo.setCurrentBufferSize(dataQueue.size)
+    }
 
-                runBlocking {
-                    sendUpdate()
-                }
-            }
+    private fun clearQueue() {
+        dataQueue.clear()
+        repo.setCurrentBufferSize(0)
     }
 
     private suspend fun sendUpdate() {
-        val now = OffsetDateTime.now()
+        putDatapointOnQueue()
 
         withContext(Dispatchers.IO) {
             try {
                 val url = URL("http://192.168.2.55:8080/api/data/8c1c59c5-faaf-42c5-88c6-bf80049f1c0f")
 
-                val datapoints = arrayOf(
-                    Datapoint(
-                        lastLocation?.latitude ?: -1.0,
-                        lastLocation?.longitude ?: -1.0,
-                        lastStepCount ?: -1,
-                        now.toString()
-                    )
-                )
-                val jsonInputString = Json.encodeToString(datapoints)
+                val jsonInputString = Json.encodeToString(dataQueue)
 
                 val connection = url.openConnection() as HttpURLConnection
                 connection.connectTimeout = 1000
@@ -122,7 +125,7 @@ class LocationStepService : Service(), SensorEventListener {
                 val responseCode = connection.responseCode
                 if (responseCode == HttpURLConnection.HTTP_OK) {
                     // Handle success
-                    Log.d("GeoApp", "Request sent.")
+                    clearQueue()
                 } else {
                     // Handle error
                     Log.e("GeoApp", "Request failed. Status code: $responseCode")
@@ -135,23 +138,29 @@ class LocationStepService : Service(), SensorEventListener {
     }
 
     private fun scheduleUpdates() {
-        if (ActivityCompat.checkSelfPermission(
-                applicationContext,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED || ActivityCompat.checkSelfPermission(
-                applicationContext,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-
        scope.launch(Dispatchers.Default) {
            while (!job.isCancelled) {
-               onUpdate()
+               if (repo.collecting.value == true) {
+                   sendUpdate()
+               }
                delay((repo.frequency.value ?: DEFAULT_FREQUENCY) * 1000)
            }
        }
+    }
+
+    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
+    private fun startLocationUpdates() {
+        val locationRequest = LocationRequest
+            .Builder(Priority.PRIORITY_HIGH_ACCURACY, (repo.frequency.value ?: DEFAULT_FREQUENCY) * 1000)
+            .setMaxUpdateDelayMillis((repo.frequency.value ?: DEFAULT_FREQUENCY) * 500)
+            .build()
+
+        // Register for location updates
+        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
+    }
+
+    private fun stopLocationUpdates() {
+        fusedLocationClient.removeLocationUpdates(locationCallback)
     }
 
     private fun createNotification(): Notification {
@@ -170,6 +179,10 @@ class LocationStepService : Service(), SensorEventListener {
         return notificationBuilder.build()
     }
 
+    fun onLocationChanged(locationResult: LocationResult) {
+        lastLocation = locationResult.lastLocation
+    }
+
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
             lastStepCount = event.values[0].toInt()
@@ -180,13 +193,10 @@ class LocationStepService : Service(), SensorEventListener {
         // Handle sensor accuracy changes
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         sensorManager.unregisterListener(this)
+        stopLocationUpdates()
         job.cancel()
     }
 }

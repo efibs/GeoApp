@@ -37,4 +37,21 @@ class HomeViewModel : BaseObservable() {
             repo.setFrequency(value.toLong())
             notifyPropertyChanged(BR.frequency)
         }
+
+    @get:Bindable
+    val bufferCurrent = repo.currentBufferSize
+
+    @get:Bindable
+    val bufferMax = repo.bufferSize
+
+    @get:Bindable
+    val bufferText: String
+        get() = "${repo.currentBufferSize.value ?: 0} / ${repo.bufferSize}"
+
+    init {
+        repo.currentBufferSize.observeForever {
+            notifyPropertyChanged(BR.bufferCurrent)
+            notifyPropertyChanged(BR.bufferText)
+        }
+    }
 }
