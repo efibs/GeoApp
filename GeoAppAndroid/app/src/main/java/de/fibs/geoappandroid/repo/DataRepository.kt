@@ -1,6 +1,5 @@
 package de.fibs.geoappandroid.repo
 
-import android.app.Application
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 
@@ -12,7 +11,7 @@ class DataRepository private constructor() {
         _collecting.postValue(coll)
     }
 
-    private val _frequency = MutableLiveData(60L)
+    private val _frequency = MutableLiveData(DEFAULT_FREQUENCY)
     val frequency: LiveData<Long> = _frequency
 
     fun setFrequency(freq: Long) {
@@ -28,5 +27,7 @@ class DataRepository private constructor() {
                 INSTANCE ?: DataRepository().also { INSTANCE = it }
             }
         }
+
+        public var DEFAULT_FREQUENCY = 10L;
     }
 }

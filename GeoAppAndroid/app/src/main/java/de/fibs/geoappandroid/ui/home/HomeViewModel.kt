@@ -4,6 +4,7 @@ import androidx.databinding.BaseObservable
 import androidx.databinding.Bindable
 import de.fibs.geoappandroid.BR
 import de.fibs.geoappandroid.repo.DataRepository
+import de.fibs.geoappandroid.repo.DataRepository.Companion.DEFAULT_FREQUENCY
 
 
 class HomeViewModel : BaseObservable() {
@@ -28,7 +29,7 @@ class HomeViewModel : BaseObservable() {
 
     @get:Bindable
     var frequency: String
-        get() = (repo.frequency.value ?: 60).toString()
+        get() = (repo.frequency.value ?: DEFAULT_FREQUENCY).toString()
         set(value) {
             if (value.isEmpty()) {
                 return;

@@ -7,16 +7,16 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.util.Log
 import androidx.annotation.RequiresPermission
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -25,7 +25,12 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import de.fibs.geoappandroid.R
 import de.fibs.geoappandroid.models.Datapoint
 import de.fibs.geoappandroid.repo.DataRepository
+import de.fibs.geoappandroid.repo.DataRepository.Companion.DEFAULT_FREQUENCY
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -43,6 +48,8 @@ class LocationStepService : Service(), SensorEventListener {
     private var stepSensor: Sensor? = null
     private var lastStepCount: Int? = null
     private var lastLocation: Location? = null
+    private val job = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.Main + job)
 
     override fun onCreate() {
         super.onCreate()
@@ -98,6 +105,8 @@ class LocationStepService : Service(), SensorEventListener {
                 val jsonInputString = Json.encodeToString(datapoints)
 
                 val connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 1000
+                connection.readTimeout = 1000
                 connection.requestMethod = "PUT"
                 connection.setRequestProperty("Content-Type", "application/json; utf-8")
                 connection.setRequestProperty("Accept", "application/json")
@@ -122,21 +131,27 @@ class LocationStepService : Service(), SensorEventListener {
             } catch (ex: Exception) {
                 Log.e("GeoApp", "Failed to send request.", ex)
             }
-
         }
     }
 
     private fun scheduleUpdates() {
-        val handler = Handler(Looper.getMainLooper())
-        handler.postDelayed(object : Runnable {
-            @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
-            override fun run() {
-                if (repo.collecting.value == true) {
-                    onUpdate()
-                }
-                handler.postDelayed(this, (repo.frequency.value ?: 60) * 1000) // Repeat
-            }
-        }, 1000)
+        if (ActivityCompat.checkSelfPermission(
+                applicationContext,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED || ActivityCompat.checkSelfPermission(
+                applicationContext,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
+       scope.launch(Dispatchers.Default) {
+           while (!job.isCancelled) {
+               onUpdate()
+               delay((repo.frequency.value ?: DEFAULT_FREQUENCY) * 1000)
+           }
+       }
     }
 
     private fun createNotification(): Notification {
@@ -172,5 +187,6 @@ class LocationStepService : Service(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         sensorManager.unregisterListener(this)
+        job.cancel()
     }
 }
