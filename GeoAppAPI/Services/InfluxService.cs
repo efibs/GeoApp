@@ -7,16 +7,28 @@ namespace GeoAppAPI.Services;
 
 public class InfluxService(InfluxDBClient influxDbClient)
 {
-    public async Task<List<Data>> QueryAsync(string userId)
+    public async Task<List<Data>> QueryAsync(string userId, DateTimeOffset? from, DateTimeOffset? to)
     {
         var bucketName = _getBucketName(userId);
         await _ensureBucketExistsAsync(bucketName).ConfigureAwait(false);
         
         var api = influxDbClient.GetQueryApi();
-        
-        var results = await InfluxDBQueryable<Data>
+
+        var query =  InfluxDBQueryable<Data>
             .Queryable(bucket: bucketName, Organisation, api)
-            .GetAsyncEnumerator()
+            .GetAsyncEnumerator();
+
+        if (from.HasValue)
+        {
+            query = query.Where(x => x.Timestamp >= from.Value);
+        }
+
+        if (to.HasValue)
+        {
+            query = query.Where(x => x.Timestamp <= to.Value);
+        }
+        
+        var results = await query
             .ToListAsync()
             .ConfigureAwait(false);
         

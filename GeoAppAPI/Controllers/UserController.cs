@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using GeoAppAPI.Dtos;
 using GeoAppAPI.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -16,19 +17,19 @@ public class UserController(IConfiguration config, UserManager<User> userManager
     : ControllerBase
 {
     [HttpPost]
-    public async Task<ActionResult<JwtToken>> RegisterUser([FromBody] Register register)
+    public async Task<ActionResult<JwtTokenDto>> RegisterUser([FromBody] RegisterDto registerDto)
     {
         var user = new User
         {
-            UserName = register.Username,
+            UserName = registerDto.Username,
         };
-        var result = await userManager.CreateAsync(user, register.Password).ConfigureAwait(false);
+        var result = await userManager.CreateAsync(user, registerDto.Password).ConfigureAwait(false);
         if (!result.Succeeded)
         {
             return BadRequest(result.Errors);
         }
 
-        var createdUser = await userManager.FindByNameAsync(register.Username).ConfigureAwait(false);
+        var createdUser = await userManager.FindByNameAsync(registerDto.Username).ConfigureAwait(false);
 
         if (createdUser == null)
         {
@@ -37,21 +38,21 @@ public class UserController(IConfiguration config, UserManager<User> userManager
 
         var token = _generateJSONWebToken(createdUser, TimeSpan.FromHours(2), Permissions.All);
 
-        return Ok(new JwtToken { Token = token });
+        return Ok(new JwtTokenDto { Token = token });
     }
 
     [HttpPost]
     [Route("login")]
-    public async Task<ActionResult<JwtToken>> Login([FromBody] Login login)
+    public async Task<ActionResult<JwtTokenDto>> Login([FromBody] LoginDto loginDto)
     {
-        var user = await userManager.FindByNameAsync(login.Username).ConfigureAwait(false);
+        var user = await userManager.FindByNameAsync(loginDto.Username).ConfigureAwait(false);
 
         if (user == null)
         {
             return Unauthorized();
         }
 
-        var passwordValid = await userManager.CheckPasswordAsync(user, login.Password).ConfigureAwait(false);
+        var passwordValid = await userManager.CheckPasswordAsync(user, loginDto.Password).ConfigureAwait(false);
 
         if (!passwordValid)
         {
@@ -60,13 +61,13 @@ public class UserController(IConfiguration config, UserManager<User> userManager
 
         var token = _generateJSONWebToken(user, TimeSpan.FromHours(2), Permissions.All);
 
-        return Ok(new JwtToken { Token = token });
+        return Ok(new JwtTokenDto { Token = token });
     }
 
     [HttpPost]
     [Route("{userId}/tokens")]
     [Authorize(Permissions.GenerateToken)]
-    public async Task<ActionResult<JwtToken>> GenerateToken(Guid userId, GenerateToken generateToken)
+    public async Task<ActionResult<JwtTokenDto>> GenerateToken(Guid userId, GenerateTokenDto generateTokenDto)
     {
         var claimUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -89,15 +90,15 @@ public class UserController(IConfiguration config, UserManager<User> userManager
             return Unauthorized();
         }
 
-        if (generateToken.Permissions.Any(p => p is Permissions.All or Permissions.GenerateToken) ||
-            generateToken.Expiry > TimeSpan.FromDays(365))
+        if (generateTokenDto.Permissions.Any(p => p is Permissions.All or Permissions.GenerateToken) ||
+            generateTokenDto.Expiry > TimeSpan.FromDays(365))
         {
             return BadRequest();
         }
 
-        var token = _generateJSONWebToken(user, generateToken.Expiry, generateToken.Permissions);
+        var token = _generateJSONWebToken(user, generateTokenDto.Expiry, generateTokenDto.Permissions);
 
-        return Ok(new JwtToken { Token = token });
+        return Ok(new JwtTokenDto { Token = token });
     }
 
     private string _generateJSONWebToken(User userInfo, TimeSpan expiry, params string[] permissions)

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using GeoAppAPI.Dtos.Assemblers;
 using GeoAppAPI.Models;
 using GeoAppAPI.Services;
 using InfluxDB.Client;
@@ -15,7 +16,7 @@ public class DataController(ILogger<DataController> logger, InfluxService influx
 {
     [HttpGet]
     [Authorize(Permissions.ReadData)]
-    public async Task<ActionResult<IEnumerable<Data>>> Get(Guid userId)
+    public async Task<ActionResult<IEnumerable<DataDto>>> Get(Guid userId, DateTimeOffset? from = null, DateTimeOffset? to = null)
     {
         var claimUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(claimUserIdString))
@@ -31,14 +32,18 @@ public class DataController(ILogger<DataController> logger, InfluxService influx
         
         logger.LogDebug("New data received");
         
-        var results = await influxService.QueryAsync(claimUserIdString).ConfigureAwait(false);
+        var results = await influxService
+            .QueryAsync(claimUserIdString, from, to)
+            .ConfigureAwait(false);
+
+        var dataDtos = DataDtoAssembler.AssembleDtos(results);
         
-        return Ok(results);
+        return Ok(dataDtos);
     }
     
     [HttpPut]
     [Authorize(Permissions.WriteData)]
-    public async Task<IActionResult> Put(Guid userId, IEnumerable<Data> data)
+    public async Task<IActionResult> Put(Guid userId, IEnumerable<DataDto> data)
     {
         var claimUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(claimUserIdString))
@@ -51,8 +56,10 @@ public class DataController(ILogger<DataController> logger, InfluxService influx
         {
             return Unauthorized();
         }
+
+        var dataModels = DataDtoAssembler.AssembleModels(data);
         
-        await influxService.WriteAsync(claimUserIdString, data).ConfigureAwait(false);
+        await influxService.WriteAsync(claimUserIdString, dataModels).ConfigureAwait(false);
 
         return Ok();
     }
