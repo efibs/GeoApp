@@ -15,7 +15,7 @@ services:
     - "--mode=server"
     - "--frontend-port=57000"
     - "--backend-port=57200"
-    - "--roslyn-worker-port=57401"
+    - "--roslyn-worker-port=57404"
     - "--timeout=60"
     environment:
       ASPNETCORE_ENVIRONMENT: "Development"
@@ -24,14 +24,14 @@ services:
       RESHARPER_LOG_CONF: "/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
     image: "geoappapi:dev"
     ports:
-    - "127.0.0.1:57001:57000"
-    - "127.0.0.1:57201:57200"
-    - "127.0.0.1:57401:57401"
+    - "127.0.0.1:57004:57000"
+    - "127.0.0.1:57204:57200"
+    - "127.0.0.1:57404:57404"
     volumes:
     - "/home/emuser/repos/GeoApp/GeoAppAPI:/app:rw"
     - "/home/emuser/repos/GeoApp:/src:rw"
     - "/home/emuser/.nuget/packages:/home/app/.nuget/packages"
     - "/home/emuser/.local/share/JetBrains/RiderRemoteDebugger/2025.1/Linux64:/opt/JetBrains/RiderDebuggerTools"
     - "/snap/rider/569/bin/backend-log.xml:/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
-    - "/home/emuser/.cache/JetBrains/Rider2025.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2025_4_29_20_39_08:/var/opt/JetBrains/RiderDebuggerTools:rw"
+    - "/home/emuser/.cache/JetBrains/Rider2025.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2025_4_29_21_01_45:/var/opt/JetBrains/RiderDebuggerTools:rw"
     working_dir: "/app"

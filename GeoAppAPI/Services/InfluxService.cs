@@ -84,16 +84,9 @@ public class InfluxService(InfluxDBClient influxDbClient)
 
     private static string _buildFluxQuery(string bucketName, DateTimeOffset? from, DateTimeOffset? to)
     {
-        var fluxBuilder = new StringBuilder("from(bucket: \"");
+        var fluxBuilder = new StringBuilder("from(bucket:\"");
         fluxBuilder.Append(bucketName);
-        fluxBuilder.Append("\")");
-
-        if (!from.HasValue && !to.HasValue)
-        {
-            return fluxBuilder.ToString();
-        }
-        
-        fluxBuilder.Append(" |> range(");
+        fluxBuilder.Append("\") |> range(");
 
         if (from.HasValue && to.HasValue)
         {
@@ -111,12 +104,17 @@ public class InfluxService(InfluxDBClient influxDbClient)
         }
         else if (to.HasValue)
         {
-            fluxBuilder.Append("start: 1970-01-01T00:00:00Z, stop: ");
+            fluxBuilder.Append("start: 0, stop: ");
             fluxBuilder.Append(to.Value.ToString("s"));
             fluxBuilder.Append('Z');
         }
+        else
+        {
+            fluxBuilder.Append("start: 0");
+        }
             
-        fluxBuilder.Append(')');
+        // Apply pivot to "flatten" the results of the query into the POCO format
+        fluxBuilder.Append(") |> pivot(rowKey:[\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")");
 
         return fluxBuilder.ToString();
     }
