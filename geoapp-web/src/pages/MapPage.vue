@@ -23,7 +23,7 @@ const to = ref<Date>();
 const data = ref<Datapoint[]>([]);
 
 watchEffect((onCleanup) => {
-  quasar.loading.show({ delay: 50 });
+  quasar.loading.show({ delay: 100 });
 
   const controller = new AbortController();
 
