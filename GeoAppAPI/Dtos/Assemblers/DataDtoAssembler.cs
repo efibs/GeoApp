@@ -5,9 +5,9 @@ namespace GeoAppAPI.Dtos.Assemblers;
 
 public static class DataDtoAssembler
 {
-    public static IEnumerable<DataDto> AssembleDtos(IEnumerable<Data> models)
+    public static List<DataDto> AssembleDtos(IEnumerable<Data> models)
     {
-        return models.Select(AssembleDto);
+        return models.Select(AssembleDto).ToList();
     }
     
     public static DataDto AssembleDto(Data model)
@@ -21,9 +21,9 @@ public static class DataDtoAssembler
         };
     }
     
-    public static IEnumerable<Data> AssembleModels(IEnumerable<DataDto> dtos)
+    public static List<Data> AssembleModels(IEnumerable<DataDto> dtos)
     {
-        return dtos.Select(AssembleModel);
+        return dtos.Select(AssembleModel).ToList();
     }
     
     public static Data AssembleModel(DataDto dto)
@@ -33,7 +33,7 @@ public static class DataDtoAssembler
             Latitude = dto.Latitude,
             Longitude = dto.Longitude,
             Steps = dto.Steps,
-            Timestamp = dto.Timestamp.DateTime,
+            Timestamp = dto.Timestamp.UtcDateTime,
         };
     }
 }

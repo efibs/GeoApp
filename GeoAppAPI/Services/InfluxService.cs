@@ -28,7 +28,7 @@ public class InfluxService(InfluxDBClient influxDbClient)
         return results;
     }
 
-    public async Task WriteAsync(string userId, IEnumerable<Data> data, CancellationToken cancellationToken)
+    public async Task WriteAsync(string userId, List<Data> data, CancellationToken cancellationToken)
     {
         var bucketName = _getBucketName(userId);
         await _ensureBucketExistsAsync(bucketName, cancellationToken).ConfigureAwait(false);
@@ -36,7 +36,7 @@ public class InfluxService(InfluxDBClient influxDbClient)
         var writeApi = influxDbClient.GetWriteApiAsync();
 
         await writeApi
-            .WriteMeasurementsAsync<Data>(data.ToList(), bucket: bucketName, org: Organisation, cancellationToken: cancellationToken)
+            .WriteMeasurementsAsync(data, bucket: bucketName, org: Organisation, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
     }
     
