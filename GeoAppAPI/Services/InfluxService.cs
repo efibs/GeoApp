@@ -1,3 +1,4 @@
+using System.Text;
 using GeoAppAPI.Models;
 using InfluxDB.Client;
 using InfluxDB.Client.Api.Domain;
@@ -7,6 +8,8 @@ namespace GeoAppAPI.Services;
 
 public class InfluxService(InfluxDBClient influxDbClient)
 {
+    // Flux documentation: https://docs.influxdata.com/influxdb/cloud/query-data/get-started/query-influxdb/
+    
     public async Task<List<Data>> QueryAsync(string userId, 
         DateTimeOffset? from, 
         DateTimeOffset? to, 
@@ -17,22 +20,10 @@ public class InfluxService(InfluxDBClient influxDbClient)
         
         var api = influxDbClient.GetQueryApi();
 
-        var query =  InfluxDBQueryable<Data>
-            .Queryable(bucket: bucketName, Organisation, api)
-            .GetAsyncEnumerator(cancellationToken);
-
-        if (from.HasValue)
-        {
-            query = query.Where(x => x.Timestamp >= from.Value);
-        }
-
-        if (to.HasValue)
-        {
-            query = query.Where(x => x.Timestamp <= to.Value);
-        }
-        
-        var results = await query
-            .ToListAsync(cancellationToken);
+        var flux = _buildFluxQuery(bucketName, from, to);
+        var results = await api
+            .QueryAsync<Data>(flux, Organisation, cancellationToken)
+            .ConfigureAwait(false);
         
         return results;
     }
@@ -89,6 +80,45 @@ public class InfluxService(InfluxDBClient influxDbClient)
     private static string _getBucketName(string userId)
     {
         return $"user-{userId}";
+    }
+
+    private static string _buildFluxQuery(string bucketName, DateTimeOffset? from, DateTimeOffset? to)
+    {
+        var fluxBuilder = new StringBuilder("from(bucket: \"");
+        fluxBuilder.Append(bucketName);
+        fluxBuilder.Append("\")");
+
+        if (!from.HasValue && !to.HasValue)
+        {
+            return fluxBuilder.ToString();
+        }
+        
+        fluxBuilder.Append(" |> range(");
+
+        if (from.HasValue && to.HasValue)
+        {
+            fluxBuilder.Append("start: ");
+            fluxBuilder.Append(from.Value.ToString("s"));
+            fluxBuilder.Append("Z, stop: ");
+            fluxBuilder.Append(to.Value.ToString("s"));
+            fluxBuilder.Append('Z');
+        }
+        else if (from.HasValue)
+        {
+            fluxBuilder.Append("start: ");
+            fluxBuilder.Append(from.Value.ToString("s"));
+            fluxBuilder.Append('Z');
+        }
+        else if (to.HasValue)
+        {
+            fluxBuilder.Append("start: 1970-01-01T00:00:00Z, stop: ");
+            fluxBuilder.Append(to.Value.ToString("s"));
+            fluxBuilder.Append('Z');
+        }
+            
+        fluxBuilder.Append(')');
+
+        return fluxBuilder.ToString();
     }
     
     private const string Organisation = "GeoApp";
