@@ -26,8 +26,10 @@ import de.fibs.geoappandroid.repo.DataRepository
 import de.fibs.geoappandroid.repo.DataRepository.Companion.DEFAULT_FREQUENCY
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -39,6 +41,8 @@ import java.time.OffsetDateTime
 
 class LocationStepService : LifecycleService(), SensorEventListener {
 
+    //region Private fields
+
     private val repo = DataRepository.getInstance()
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
@@ -46,9 +50,13 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     private var stepSensor: Sensor? = null
     private var lastStepCount: Int? = null
     private var lastLocation: Location? = null
-    private val job = SupervisorJob()
-    private val scope = CoroutineScope(Dispatchers.Main + job)
+    private val scope = CoroutineScope(Dispatchers.Main)
     private val dataQueue: ArrayList<Datapoint> = ArrayList(repo.bufferSize)
+    private var loopJob: Job? = null
+
+    //endregion
+
+    //region Android lifecycle
 
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     override fun onCreate() {
@@ -61,42 +69,64 @@ class LocationStepService : LifecycleService(), SensorEventListener {
         val notification = createNotification()
         startForeground(1, notification)
 
-        // Register for step counter updates
-        stepSensor?.also { sensor ->
-            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
-        }
-
+        // Create the location callback
         locationCallback = object: LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 onLocationChanged(locationResult)
             }
         }
 
-        // Start the location updates
-        startLocationUpdates()
-
+        // Observe frequency change
         repo.frequency.observe(this) { stopLocationUpdates(); startLocationUpdates() }
 
-        // Schedule location and step count updates every minute
-        scheduleUpdates()
+        // Observe collecting change
+        repo.collecting.observe(this) {
+            if (repo.collecting.value == true) {
+                scheduleUpdates()
+            } else {
+                stopUpdates()
+            }
+        }
     }
 
-    private fun putDatapointOnQueue() {
-        val now = OffsetDateTime.now()
-        val datapoint = Datapoint(
-            lastLocation?.latitude ?: -1.0,
-            lastLocation?.longitude ?: -1.0,
-            lastStepCount ?: -1,
-            now.toString()
-        )
-        dataQueue.add(datapoint)
-        repo.setCurrentBufferSize(dataQueue.size)
+    override fun onDestroy() {
+        super.onDestroy()
+        stopUpdates()
     }
 
-    private fun clearQueue() {
-        dataQueue.clear()
-        repo.setCurrentBufferSize(0)
+    //endregion
+
+    //region Worker coroutine
+
+    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
+    private fun scheduleUpdates() {
+        startLocationUpdates()
+
+        // Register for step counter updates
+        stepSensor?.also { sensor ->
+            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
+        }
+
+        loopJob = scope.launch(Dispatchers.Default) {
+           while (isActive) {
+               delay((repo.frequency.value ?: DEFAULT_FREQUENCY) * 1000)
+               if (repo.collecting.value == true) {
+                   sendUpdate()
+               }
+           }
+       }
     }
+
+    private fun stopUpdates() {
+        loopJob?.cancel()
+        loopJob = null
+        stopLocationUpdates()
+        sensorManager.unregisterListener(this)
+    }
+
+    //endregion
+
+    //region Send data
 
     private suspend fun sendUpdate() {
         putDatapointOnQueue()
@@ -117,7 +147,6 @@ class LocationStepService : LifecycleService(), SensorEventListener {
                 connection.doOutput = true
 
                 connection.outputStream.use { os: OutputStream ->
-                    Log.d("GeoApp", "Sending data: $jsonInputString")
                     val input: ByteArray = jsonInputString.toByteArray(Charsets.UTF_8)
                     os.write(input, 0, input.size)
                 }
@@ -137,16 +166,9 @@ class LocationStepService : LifecycleService(), SensorEventListener {
         }
     }
 
-    private fun scheduleUpdates() {
-       scope.launch(Dispatchers.Default) {
-           while (!job.isCancelled) {
-               if (repo.collecting.value == true) {
-                   sendUpdate()
-               }
-               delay((repo.frequency.value ?: DEFAULT_FREQUENCY) * 1000)
-           }
-       }
-    }
+    //endregion
+
+    //region Location sensor
 
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private fun startLocationUpdates() {
@@ -162,6 +184,49 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     private fun stopLocationUpdates() {
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
+
+    fun onLocationChanged(locationResult: LocationResult) {
+        lastLocation = locationResult.lastLocation
+    }
+
+    //endregion
+
+    //region Step sensor
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
+            lastStepCount = event.values[0].toInt()
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // Handle sensor accuracy changes
+    }
+
+    //endregion
+
+    //region Send buffer
+
+    private fun putDatapointOnQueue() {
+        val now = OffsetDateTime.now()
+        val datapoint = Datapoint(
+            lastLocation?.latitude ?: -1.0,
+            lastLocation?.longitude ?: -1.0,
+            lastStepCount ?: -1,
+            now.toString()
+        )
+        dataQueue.add(datapoint)
+        repo.setCurrentBufferSize(dataQueue.size)
+    }
+
+    private fun clearQueue() {
+        dataQueue.clear()
+        repo.setCurrentBufferSize(0)
+    }
+
+    //endregion
+
+    //region Foreground service boilerplate
 
     private fun createNotification(): Notification {
         val channelId = "location_step_service_channel"
@@ -179,24 +244,5 @@ class LocationStepService : LifecycleService(), SensorEventListener {
         return notificationBuilder.build()
     }
 
-    fun onLocationChanged(locationResult: LocationResult) {
-        lastLocation = locationResult.lastLocation
-    }
-
-    override fun onSensorChanged(event: SensorEvent?) {
-        if (event?.sensor?.type == Sensor.TYPE_STEP_COUNTER) {
-            lastStepCount = event.values[0].toInt()
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        // Handle sensor accuracy changes
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        sensorManager.unregisterListener(this)
-        stopLocationUpdates()
-        job.cancel()
-    }
+    //endregion
 }
