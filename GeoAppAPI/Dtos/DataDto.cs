@@ -1,4 +1,4 @@
-namespace GeoAppAPI.Models;
+namespace GeoAppAPI.Dtos;
 
 public class DataDto
 {

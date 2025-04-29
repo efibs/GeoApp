@@ -1,9 +1,8 @@
 using System.Security.Claims;
+using GeoAppAPI.Dtos;
 using GeoAppAPI.Dtos.Assemblers;
 using GeoAppAPI.Models;
 using GeoAppAPI.Services;
-using InfluxDB.Client;
-using InfluxDB.Client.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

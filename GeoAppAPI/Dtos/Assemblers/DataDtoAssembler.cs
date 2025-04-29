@@ -1,3 +1,4 @@
+using GeoAppAPI.Dtos;
 using GeoAppAPI.Models;
 
 namespace GeoAppAPI.Dtos.Assemblers;
