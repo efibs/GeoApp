@@ -17,7 +17,7 @@ public class UserController(IConfiguration config, UserManager<User> userManager
     : ControllerBase
 {
     [HttpPost]
-    public async Task<ActionResult<JwtTokenDto>> RegisterUser([FromBody] RegisterDto registerDto)
+    public async Task<ActionResult<JwtTokenDto>> RegisterUser([FromBody] RegisterDto registerDto, CancellationToken cancellationToken = default)
     {
         var user = new User
         {
@@ -43,7 +43,7 @@ public class UserController(IConfiguration config, UserManager<User> userManager
 
     [HttpPost]
     [Route("login")]
-    public async Task<ActionResult<JwtTokenDto>> Login([FromBody] LoginDto loginDto)
+    public async Task<ActionResult<JwtTokenDto>> Login([FromBody] LoginDto loginDto, CancellationToken cancellationToken = default)
     {
         var user = await userManager.FindByNameAsync(loginDto.Username).ConfigureAwait(false);
 
@@ -67,7 +67,7 @@ public class UserController(IConfiguration config, UserManager<User> userManager
     [HttpPost]
     [Route("{userId}/tokens")]
     [Authorize(Permissions.GenerateToken)]
-    public async Task<ActionResult<JwtTokenDto>> GenerateToken(Guid userId, GenerateTokenDto generateTokenDto)
+    public async Task<ActionResult<JwtTokenDto>> GenerateToken(Guid userId, GenerateTokenDto generateTokenDto, CancellationToken cancellationToken = default)
     {
         var claimUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
 

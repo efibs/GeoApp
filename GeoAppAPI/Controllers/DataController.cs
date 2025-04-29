@@ -16,7 +16,10 @@ public class DataController(ILogger<DataController> logger, InfluxService influx
 {
     [HttpGet]
     [Authorize(Permissions.ReadData)]
-    public async Task<ActionResult<IEnumerable<DataDto>>> Get(Guid userId, DateTimeOffset? from = null, DateTimeOffset? to = null)
+    public async Task<ActionResult<IEnumerable<DataDto>>> Get(Guid userId, 
+        DateTimeOffset? from = null, 
+        DateTimeOffset? to = null, 
+        CancellationToken cancellationToken = default)
     {
         var claimUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(claimUserIdString))
@@ -33,7 +36,7 @@ public class DataController(ILogger<DataController> logger, InfluxService influx
         logger.LogDebug("New data received");
         
         var results = await influxService
-            .QueryAsync(claimUserIdString, from, to)
+            .QueryAsync(claimUserIdString, from, to, cancellationToken)
             .ConfigureAwait(false);
 
         var dataDtos = DataDtoAssembler.AssembleDtos(results);
@@ -43,7 +46,9 @@ public class DataController(ILogger<DataController> logger, InfluxService influx
     
     [HttpPut]
     [Authorize(Permissions.WriteData)]
-    public async Task<IActionResult> Put(Guid userId, IEnumerable<DataDto> data)
+    public async Task<IActionResult> Put(Guid userId, 
+        IEnumerable<DataDto> data, 
+        CancellationToken cancellationToken = default)
     {
         var claimUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(claimUserIdString))
@@ -59,7 +64,7 @@ public class DataController(ILogger<DataController> logger, InfluxService influx
 
         var dataModels = DataDtoAssembler.AssembleModels(data);
         
-        await influxService.WriteAsync(claimUserIdString, dataModels).ConfigureAwait(false);
+        await influxService.WriteAsync(claimUserIdString, dataModels, cancellationToken).ConfigureAwait(false);
 
         return Ok();
     }

@@ -7,16 +7,19 @@ namespace GeoAppAPI.Services;
 
 public class InfluxService(InfluxDBClient influxDbClient)
 {
-    public async Task<List<Data>> QueryAsync(string userId, DateTimeOffset? from, DateTimeOffset? to)
+    public async Task<List<Data>> QueryAsync(string userId, 
+        DateTimeOffset? from, 
+        DateTimeOffset? to, 
+        CancellationToken cancellationToken)
     {
         var bucketName = _getBucketName(userId);
-        await _ensureBucketExistsAsync(bucketName).ConfigureAwait(false);
+        await _ensureBucketExistsAsync(bucketName, cancellationToken).ConfigureAwait(false);
         
         var api = influxDbClient.GetQueryApi();
 
         var query =  InfluxDBQueryable<Data>
             .Queryable(bucket: bucketName, Organisation, api)
-            .GetAsyncEnumerator();
+            .GetAsyncEnumerator(cancellationToken);
 
         if (from.HasValue)
         {
@@ -29,56 +32,55 @@ public class InfluxService(InfluxDBClient influxDbClient)
         }
         
         var results = await query
-            .ToListAsync()
-            .ConfigureAwait(false);
+            .ToListAsync(cancellationToken);
         
         return results;
     }
 
-    public async Task WriteAsync(string userId, IEnumerable<Data> data)
+    public async Task WriteAsync(string userId, IEnumerable<Data> data, CancellationToken cancellationToken)
     {
         var bucketName = _getBucketName(userId);
-        await _ensureBucketExistsAsync(bucketName).ConfigureAwait(false);
+        await _ensureBucketExistsAsync(bucketName, cancellationToken).ConfigureAwait(false);
         
         var writeApi = influxDbClient.GetWriteApiAsync();
 
         await writeApi
-            .WriteMeasurementsAsync<Data>(data.ToList(), bucket: bucketName, org: Organisation)
+            .WriteMeasurementsAsync<Data>(data.ToList(), bucket: bucketName, org: Organisation, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
     }
     
-    private async Task _ensureBucketExistsAsync(string bucketName)
+    private async Task _ensureBucketExistsAsync(string bucketName, CancellationToken cancellationToken)
     {
-        var orgId = await _ensureOrganisationExistsAsync().ConfigureAwait(false);
+        var orgId = await _ensureOrganisationExistsAsync(cancellationToken).ConfigureAwait(false);
         
         var bucketsApi = influxDbClient.GetBucketsApi();
 
         var bucket = await bucketsApi
-            .FindBucketByNameAsync(bucketName)
+            .FindBucketByNameAsync(bucketName, cancellationToken)
             .ConfigureAwait(false);
 
         if (bucket == null)
         {
             var retentionRule = new BucketRetentionRules(everySeconds: 0);
             await bucketsApi
-                .CreateBucketAsync(bucketName, retentionRule, orgId)
+                .CreateBucketAsync(bucketName, retentionRule, orgId, cancellationToken)
                 .ConfigureAwait(false);
         }
     }
     
-    private async Task<string> _ensureOrganisationExistsAsync()
+    private async Task<string> _ensureOrganisationExistsAsync(CancellationToken cancellationToken)
     {
         var organisationsApi = influxDbClient.GetOrganizationsApi();
         
         var organisations = await organisationsApi
-            .FindOrganizationsAsync()
+            .FindOrganizationsAsync(cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
         var organisation = organisations
             .FirstOrDefault(org => org.Name == Organisation); 
             
         organisation ??= await organisationsApi
-            .CreateOrganizationAsync(Organisation)
+            .CreateOrganizationAsync(Organisation, cancellationToken)
             .ConfigureAwait(false);
 
         return organisation.Id;
