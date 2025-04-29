@@ -6,7 +6,7 @@
 
         <q-toolbar-title>
           <q-avatar>
-            <img src="https://cdn.quasar.dev/logo-v2/svg/logo-mono-white.svg" />
+            <img src="icons/favicon-128x128.png" />
           </q-avatar>
           GeoApp
         </q-toolbar-title>
