@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { useJwt } from '@vueuse/integrations/useJwt';
+import type { JwtToken, Register } from 'src/components/models';
 import { ClaimTypeUserId, ClaimTypeUsername, type Login } from 'src/components/models';
 import { useLocalStorage } from '@vueuse/core';
 import { computed } from 'vue';
@@ -28,7 +29,12 @@ export const useAuthStore = defineStore('auth', () => {
   };
 
   const signInAsync = async (login: Login) => {
-    const response = await axios.post(`${process.env.API_BASE_URL}/users/login`, login);
+    const response = await axios.post<JwtToken>(`${process.env.API_BASE_URL}/users/login`, login);
+    tokenString.value = response.data.token;
+  };
+
+  const registerAsync = async (register: Register) => {
+    const response = await axios.post<JwtToken>(`${process.env.API_BASE_URL}/users`, register);
     tokenString.value = response.data.token;
   };
 
@@ -65,6 +71,7 @@ export const useAuthStore = defineStore('auth', () => {
     jwtToken,
     isSignedIn,
     signInAsync,
+    registerAsync,
     logout,
     userId,
     username,

@@ -7,7 +7,16 @@ export interface Meta {
   totalCount: number;
 }
 
+export interface JwtToken {
+  token: string;
+}
+
 export interface Login {
+  username: string;
+  password: string;
+}
+
+export interface Register {
   username: string;
   password: string;
 }
@@ -22,6 +31,11 @@ export interface Datapoint {
 export interface GenerateToken {
   expiry: string;
   permissions: string[];
+}
+
+export interface ValidationErorr {
+  code: string;
+  description: string;
 }
 
 export const ClaimTypeUserId: string =

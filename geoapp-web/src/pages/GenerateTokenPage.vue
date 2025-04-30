@@ -44,7 +44,12 @@
 <script lang="ts" setup>
 import { copyToClipboard } from 'quasar';
 import { api } from 'src/boot/axios';
-import { type GenerateToken, PermissionReadData, PermissionWriteData } from 'src/components/models';
+import {
+  type JwtToken,
+  type GenerateToken,
+  PermissionReadData,
+  PermissionWriteData,
+} from 'src/components/models';
 import { useAuthStore } from 'src/stores/authStore';
 import { computed, ref } from 'vue';
 
@@ -97,9 +102,9 @@ const generateToken = async () => {
     permissions: permissions,
   };
 
-  const response = await api.post(`/users/${nullableUserId}/tokens`, generateToken);
+  const response = await api.post<JwtToken>(`/users/${nullableUserId}/tokens`, generateToken);
 
-  token.value = response.data['token'];
+  token.value = response.data.token;
 
   showToken.value = true;
 };

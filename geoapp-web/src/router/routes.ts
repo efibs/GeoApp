@@ -20,6 +20,13 @@ const routes: RouteRecordRaw[] = [
     ],
   },
   {
+    path: '/register',
+    component: () => import('layouts/LoginLayout.vue'),
+    children: [
+      { path: '', name: 'account-register', component: () => import('pages/RegisterPage.vue') },
+    ],
+  },
+  {
     path: '/generate-token',
     component: () => import('layouts/MainLayout.vue'),
     children: [
