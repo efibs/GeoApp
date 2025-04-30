@@ -35,7 +35,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
-
                 <TextView
                     android:id="@+id/editTextText"
                     android:layout_width="100dp"
@@ -44,7 +43,6 @@
                     android:text="Frequency (s)"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent" />
-
                 <EditText
                     android:id="@+id/editTextNumber"
                     android:layout_width="70dp"
@@ -55,8 +53,6 @@
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toEndOf="@+id/editTextText" />
-
-
             </LinearLayout>
 
             <LinearLayout
@@ -98,6 +94,28 @@
                         android:gravity="center"
                         android:text="@{viewModel.bufferText}"/>
                 </RelativeLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/lastSensorUpdateTimeLabel"
+                    android:layout_width="170dp"
+                    android:layout_height="wrap_content"
+                    android:ems="10"
+                    android:text="Last sensor update time:"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent" />
+                <TextView
+                    android:id="@+id/lastSensorUpdateTime"
+                    android:layout_width="120dp"
+                    android:layout_height="wrap_content"
+                    android:ems="10"
+                    android:text="@{viewModel.lastSensorUpdateTimeText}"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent" />
             </LinearLayout>
         </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>

@@ -48,10 +48,18 @@ class HomeViewModel : BaseObservable() {
     val bufferText: String
         get() = "${repo.currentBufferSize.value ?: 0} / ${repo.bufferSize}"
 
+    @get:Bindable
+    val lastSensorUpdateTimeText: String
+        get() = repo.lastSensorUpdateTime.value?.toString() ?: "---"
+
     init {
         repo.currentBufferSize.observeForever {
             notifyPropertyChanged(BR.bufferCurrent)
             notifyPropertyChanged(BR.bufferText)
+        }
+
+        repo.lastSensorUpdateTime.observeForever {
+            notifyPropertyChanged(BR.lastSensorUpdateTimeText)
         }
     }
 }

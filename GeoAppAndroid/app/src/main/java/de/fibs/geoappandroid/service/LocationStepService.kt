@@ -27,7 +27,6 @@ import de.fibs.geoappandroid.repo.DataRepository.Companion.DEFAULT_FREQUENCY
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -38,6 +37,8 @@ import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.OffsetDateTime
+import java.util.Date
+import java.util.concurrent.ConcurrentLinkedQueue
 
 class LocationStepService : LifecycleService(), SensorEventListener {
 
@@ -49,9 +50,9 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private var stepSensor: Sensor? = null
     private var lastStepCount: Int? = null
-    private var lastLocation: Location? = null
     private val scope = CoroutineScope(Dispatchers.Main)
-    private val dataQueue: ArrayList<Datapoint> = ArrayList(repo.bufferSize)
+    private val dataQueueLock = Any()
+    private val dataQueue = ArrayList<Datapoint>(repo.bufferSize)
     private var loopJob: Job? = null
 
     //endregion
@@ -100,10 +101,6 @@ class LocationStepService : LifecycleService(), SensorEventListener {
 
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private fun scheduleUpdates() {
-        if (lastLocation == null || lastStepCount == null) {
-            return;
-        }
-
         startLocationUpdates()
 
         // Register for step counter updates
@@ -133,37 +130,41 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     //region Send data
 
     private suspend fun sendUpdate() {
-        putDatapointOnQueue()
-
         withContext(Dispatchers.IO) {
             try {
                 val url = URL("http://192.168.2.55:8080/api/data/8c1c59c5-faaf-42c5-88c6-bf80049f1c0f")
 
-                val jsonInputString = Json.encodeToString(dataQueue)
+                synchronized(dataQueueLock) {
+                    val jsonInputString = Json.encodeToString(dataQueue)
 
-                val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 1000
-                connection.readTimeout = 1000
-                connection.requestMethod = "PUT"
-                connection.setRequestProperty("Content-Type", "application/json; utf-8")
-                connection.setRequestProperty("Accept", "application/json")
-                connection.setRequestProperty("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWRtaW4iLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjhjMWM1OWM1LWZhYWYtNDJjNS04OGM2LWJmODAwNDlmMWMwZiIsIlBlcm1pc3Npb25zIjoiW1wicGVybTpXcml0ZURhdGFcIl0iLCJleHAiOjE3NDgzNTk0NzQsImlzcyI6Ikdlb0FwcCIsImF1ZCI6Ikdlb0FwcCJ9.rNCqpO2Nb5HMG971vHHboTC-r8iMZN4MYukj6EYjhfA")
-                connection.doOutput = true
+                    val connection = url.openConnection() as HttpURLConnection
+                    connection.connectTimeout = 1000
+                    connection.readTimeout = 1000
+                    connection.requestMethod = "PUT"
+                    connection.setRequestProperty("Content-Type", "application/json; utf-8")
+                    connection.setRequestProperty("Accept", "application/json")
+                    connection.setRequestProperty(
+                        "Authorization",
+                        "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWRtaW4iLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjhjMWM1OWM1LWZhYWYtNDJjNS04OGM2LWJmODAwNDlmMWMwZiIsIlBlcm1pc3Npb25zIjoiW1wicGVybTpXcml0ZURhdGFcIl0iLCJleHAiOjE3NDgzNTk0NzQsImlzcyI6Ikdlb0FwcCIsImF1ZCI6Ikdlb0FwcCJ9.rNCqpO2Nb5HMG971vHHboTC-r8iMZN4MYukj6EYjhfA"
+                    )
+                    connection.doOutput = true
 
-                connection.outputStream.use { os: OutputStream ->
-                    val input: ByteArray = jsonInputString.toByteArray(Charsets.UTF_8)
-                    os.write(input, 0, input.size)
+                    connection.outputStream.use { os: OutputStream ->
+                        val input: ByteArray = jsonInputString.toByteArray(Charsets.UTF_8)
+                        os.write(input, 0, input.size)
+                    }
+
+                    val responseCode = connection.responseCode
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        // Handle success
+                        dataQueue.clear()
+                        repo.setCurrentBufferSize(0)
+                    } else {
+                        // Handle error
+                        Log.e("GeoApp", "Request failed. Status code: $responseCode")
+                    }
+                    connection.disconnect()
                 }
-
-                val responseCode = connection.responseCode
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    // Handle success
-                    clearQueue()
-                } else {
-                    // Handle error
-                    Log.e("GeoApp", "Request failed. Status code: $responseCode")
-                }
-                connection.disconnect()
             } catch (ex: Exception) {
                 Log.e("GeoApp", "Failed to send request.", ex)
             }
@@ -178,7 +179,7 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     private fun startLocationUpdates() {
         val locationRequest = LocationRequest
             .Builder(Priority.PRIORITY_HIGH_ACCURACY, (repo.frequency.value ?: DEFAULT_FREQUENCY) * 1000)
-            .setMaxUpdateDelayMillis((repo.frequency.value ?: DEFAULT_FREQUENCY) * 500)
+            .setMaxUpdateDelayMillis(500)
             .build()
 
         // Register for location updates
@@ -190,7 +191,9 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     }
 
     fun onLocationChanged(locationResult: LocationResult) {
-        lastLocation = locationResult.lastLocation
+        val lastLocation = locationResult.lastLocation ?: return
+
+        putDatapointOnQueue(lastLocation)
     }
 
     //endregion
@@ -211,21 +214,19 @@ class LocationStepService : LifecycleService(), SensorEventListener {
 
     //region Send buffer
 
-    private fun putDatapointOnQueue() {
+    private fun putDatapointOnQueue(location: Location) {
         val now = OffsetDateTime.now()
         val datapoint = Datapoint(
-            lastLocation?.latitude ?: -3141.5,
-            lastLocation?.longitude ?: -3141.5,
+            location.latitude,
+            location.longitude,
             lastStepCount ?: -1,
             now.toString()
         )
-        dataQueue.add(datapoint)
+        synchronized(dataQueueLock) {
+            dataQueue.add(datapoint)
+        }
         repo.setCurrentBufferSize(dataQueue.size)
-    }
-
-    private fun clearQueue() {
-        dataQueue.clear()
-        repo.setCurrentBufferSize(0)
+        repo.setLastSensorUpdateTime(Date())
     }
 
     //endregion

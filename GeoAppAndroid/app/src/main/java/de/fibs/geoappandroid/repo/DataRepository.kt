@@ -2,6 +2,7 @@ package de.fibs.geoappandroid.repo
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import java.util.Date
 
 class DataRepository private constructor() {
     private val _collecting = MutableLiveData(false)
@@ -24,6 +25,13 @@ class DataRepository private constructor() {
 
     fun setCurrentBufferSize(s: Int) {
         _currentBufferSize.postValue(s)
+    }
+
+    private val _lastUpdateTime = MutableLiveData<Date?>(null)
+    val lastSensorUpdateTime: LiveData<Date?> = _lastUpdateTime
+
+    fun setLastSensorUpdateTime(newDate: Date) {
+        _lastUpdateTime.postValue(newDate)
     }
 
     companion object {
