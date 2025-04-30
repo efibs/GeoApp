@@ -100,6 +100,10 @@ class LocationStepService : LifecycleService(), SensorEventListener {
 
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private fun scheduleUpdates() {
+        if (lastLocation == null || lastStepCount == null) {
+            return;
+        }
+
         startLocationUpdates()
 
         // Register for step counter updates
@@ -210,8 +214,8 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     private fun putDatapointOnQueue() {
         val now = OffsetDateTime.now()
         val datapoint = Datapoint(
-            lastLocation?.latitude ?: -1.0,
-            lastLocation?.longitude ?: -1.0,
+            lastLocation?.latitude ?: -3141.5,
+            lastLocation?.longitude ?: -3141.5,
             lastStepCount ?: -1,
             now.toString()
         )
