@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.Date
 import com.auth0.jwt.JWT
+import com.auth0.jwt.interfaces.Claim
 
 class SettingsRepository private constructor(private val context: Context) {
 
@@ -36,6 +37,21 @@ class SettingsRepository private constructor(private val context: Context) {
                 Log.e("GeoApp", "Error while decoding token", e)
                 ""
             }
+        }
+
+    val tokenExpirationDate: Flow<Date?> = token
+        .map { token ->
+            try {
+                getExpiration(token)
+            } catch (e: Exception) {
+                Log.e("GeoApp", "Error while decoding token", e)
+                null
+            }
+        }
+
+    val tokenIsExpired: Flow<Boolean> = tokenExpirationDate
+        .map { date ->
+            date!! >= Date()
         }
 
     val apiEndpoint: Flow<String> = context.dataStore.data
@@ -90,18 +106,29 @@ class SettingsRepository private constructor(private val context: Context) {
         _lastUpdateTime.postValue(newDate)
     }
 
-    private fun getUserId(token: String): String {
-        val userIdClaimKey = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
-
-        val decodedJWT = JWT.decode(token)
-
-        val userIdClaim = decodedJWT.getClaim(userIdClaimKey) ?: throw Exception("Invalid token provided")
-
-        return userIdClaim.asString()
+    private fun getClaim(token: String, claimKey: String): Claim? {
+        if (token.isBlank()) {
+            return null
+        }
+        try {
+            val decodedJWT = JWT.decode(token)
+            val claim = decodedJWT.getClaim(claimKey) ?: throw Exception("Invalid token provided")
+            return claim
+        } catch (e: Exception) {
+            return null
+        }
     }
 
-    init {
+    private fun getUserId(token: String): String {
+        val userIdClaimKey = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+        return getClaim(token, userIdClaimKey)?.asString() ?: "--"
+    }
 
+    private fun getExpiration(token: String): Date {
+        var expirationClaimKey = "exp"
+        var expirationString = getClaim(token, expirationClaimKey)
+        var expirationDate = Date((expirationString?.asLong() ?: 0) * 1000)
+        return expirationDate
     }
 
     companion object {

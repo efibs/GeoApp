@@ -3,6 +3,7 @@ package de.fibs.geoappandroid.ui.settings
 import android.content.Context
 import androidx.databinding.BaseObservable
 import androidx.databinding.Bindable
+import androidx.lifecycle.ViewModel
 import de.fibs.geoappandroid.BR
 import de.fibs.geoappandroid.repo.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -10,8 +11,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
 
-class SettingsViewModel(context: Context) : BaseObservable() {
+class SettingsViewModel(context: Context) : BaseObservable()  {
     private val repo = SettingsRepository.getInstance(context)
 
     private var _apiEndpoint: String = runBlocking {
@@ -44,9 +48,37 @@ class SettingsViewModel(context: Context) : BaseObservable() {
             }
 
             _apiSendDataToken = value
-            notifyPropertyChanged(BR.apiSendDataToken)
             CoroutineScope(Dispatchers.IO).launch {
                 repo.setToken(value)
+                notifyPropertyChanged(BR.apiSendDataToken)
+                notifyPropertyChanged(BR.tokenExpirationDate)
+                notifyPropertyChanged(BR.tokenIsExpired)
             }
+        }
+
+    @get:Bindable
+    var tokenExpirationDate: String = "--"
+        get() {
+            val formatter = DateFormat.getDateTimeInstance(
+                DateFormat.MEDIUM, // date style
+                DateFormat.SHORT,  // time style
+                Locale.getDefault()
+            )
+
+            val expirationDate = runBlocking {
+                repo.tokenExpirationDate.first()
+            }
+
+            if (expirationDate == null) {
+                return "--"
+            }
+
+            return formatter.format(expirationDate)
+        }
+
+    @get:Bindable
+    var tokenIsExpired: Boolean = false
+        get() = runBlocking {
+            repo.tokenIsExpired.first()
         }
 }
