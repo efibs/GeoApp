@@ -1,15 +1,21 @@
 package de.fibs.geoappandroid.service
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
+import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
@@ -44,6 +50,7 @@ class LocationStepService : LifecycleService(), SensorEventListener {
 
     //region Private fields
 
+    private val ongoingTrackNotificationId = 3141
     private val repo = SettingsRepository.getInstance(null)
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
@@ -75,6 +82,7 @@ class LocationStepService : LifecycleService(), SensorEventListener {
 
     //region Android lifecycle
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     override fun onCreate() {
         super.onCreate()
@@ -83,7 +91,7 @@ class LocationStepService : LifecycleService(), SensorEventListener {
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
         // Start foreground service
-        val notification = createNotification()
+        val notification = createReadyNotification()
         startForeground(1, notification)
 
         // Create the location callback
@@ -125,14 +133,24 @@ class LocationStepService : LifecycleService(), SensorEventListener {
             }
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                onNotificationDismissedReceiver,
+                IntentFilter("DISMISSED_ACTION"),
+                RECEIVER_NOT_EXPORTED // This is required on Android 14
+            )
+        }
+
         // Observe collecting change
         repo.collecting.observe(this) {
             if (repo.collecting.value == true) {
                 scheduleSensorUpdates()
                 startSending()
+                sendPollingNotification()
             } else {
                 stopSensorUpdates()
                 stopSending()
+                removePollingNotification()
             }
         }
     }
@@ -140,6 +158,7 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         stopSensorUpdates()
+        unregisterReceiver(onNotificationDismissedReceiver)
     }
 
     //endregion
@@ -296,20 +315,49 @@ class LocationStepService : LifecycleService(), SensorEventListener {
 
     //endregion
 
-    //region Foreground service boilerplate
+    //region Notifications
 
-    private fun createNotification(): Notification {
+    private val onNotificationDismissedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            sendPollingNotification()
+        }
+    }
+
+    private fun sendPollingNotification() {
         val channelId = "location_step_service_channel"
-        val channelName = "Location and Step Tracking Service"
-        val channel = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT)
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.createNotificationChannel(channel)
+
+        val dismissedIntent = Intent("DISMISSED_ACTION")
+        dismissedIntent.setPackage(packageName)
+        val dismissedPendingIntent = PendingIntent.getBroadcast(this, ongoingTrackNotificationId, dismissedIntent, PendingIntent.FLAG_IMMUTABLE)
 
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Tracking Location and Steps")
             .setContentText("Your location and steps are being tracked in the background.")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setDeleteIntent(dismissedPendingIntent)
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(ongoingTrackNotificationId, notificationBuilder.build())
+    }
+
+    private fun removePollingNotification() {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(ongoingTrackNotificationId)
+    }
+
+    private fun createReadyNotification(): Notification {
+        val channelId = "location_step_service_channel"
+        val channelName = "Location and Step Tracking Service"
+        val channel = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_LOW)
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
+
+        val notificationBuilder = NotificationCompat.Builder(this, channelId)
+            .setContentTitle("Tracking Location and Steps")
+            .setContentText("Service is ready.")
+            .setSmallIcon(R.mipmap.ic_launcher)
 
         return notificationBuilder.build()
     }

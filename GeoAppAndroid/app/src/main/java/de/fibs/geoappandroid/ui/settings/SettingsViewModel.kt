@@ -3,7 +3,6 @@ package de.fibs.geoappandroid.ui.settings
 import android.content.Context
 import androidx.databinding.BaseObservable
 import androidx.databinding.Bindable
-import androidx.lifecycle.ViewModel
 import de.fibs.geoappandroid.BR
 import de.fibs.geoappandroid.repo.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -12,7 +11,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.text.DateFormat
-import java.util.Date
 import java.util.Locale
 
 class SettingsViewModel(context: Context) : BaseObservable()  {
