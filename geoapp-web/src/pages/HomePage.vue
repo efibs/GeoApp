@@ -4,6 +4,7 @@
     <div class="widgets-galery">
       <StepsWidget :step-data="data" />
       <TotalStepsWidget :step-data="data" />
+      <AndroidAppWidget />
     </div>
   </div>
 </template>
@@ -11,6 +12,7 @@
 <script setup lang="ts">
 import { date, useQuasar } from 'quasar';
 import { api } from 'src/boot/axios';
+import AndroidAppWidget from 'src/components/home/AndroidAppWidget.vue';
 import StepsWidget from 'src/components/home/StepsWidget.vue';
 import TotalStepsWidget from 'src/components/home/TotalStepsWidget.vue';
 import { type Datapoint } from 'src/components/models';
