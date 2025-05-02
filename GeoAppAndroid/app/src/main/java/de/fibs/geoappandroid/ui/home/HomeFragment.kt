@@ -14,13 +14,14 @@ import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.Fragment
 import de.fibs.geoappandroid.R
 import de.fibs.geoappandroid.databinding.FragmentHomeBinding
+import de.fibs.geoappandroid.repo.SettingsRepository
 import de.fibs.geoappandroid.service.LocationStepService
 
 class HomeFragment : Fragment(R.layout.fragment_home) {
 
     private lateinit var binding: FragmentHomeBinding
 
-    private val viewModel = HomeViewModel()
+    private lateinit var viewModel: HomeViewModel
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -29,8 +30,13 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     ): View {
         binding = DataBindingUtil.inflate(inflater, R.layout.fragment_home, container, false)
 
+        viewModel = HomeViewModel(requireContext())
         binding.viewModel = viewModel
         binding.lifecycleOwner = viewLifecycleOwner
+
+        // Create the repo with context
+        // This is the first instantiation of the repository. Do not remove.
+        SettingsRepository.getInstance(requireContext())
 
         val serviceIntent = Intent(requireContext(), LocationStepService::class.java)
         requireContext().startForegroundService(serviceIntent)

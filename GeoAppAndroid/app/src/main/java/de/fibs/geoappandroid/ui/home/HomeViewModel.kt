@@ -1,15 +1,20 @@
 package de.fibs.geoappandroid.ui.home
 
+import android.content.Context
 import androidx.databinding.BaseObservable
 import androidx.databinding.Bindable
 import de.fibs.geoappandroid.BR
-import de.fibs.geoappandroid.repo.DataRepository
-import de.fibs.geoappandroid.repo.DataRepository.Companion.DEFAULT_FREQUENCY
+import de.fibs.geoappandroid.repo.SettingsRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 
-class HomeViewModel : BaseObservable() {
+class HomeViewModel(context: Context) : BaseObservable() {
 
-    private val repo = DataRepository.getInstance()
+    private val repo = SettingsRepository.getInstance(context)
 
     @get:Bindable
     val collectingText: String
@@ -27,15 +32,38 @@ class HomeViewModel : BaseObservable() {
             notifyPropertyChanged(BR.collecting)
         }
 
+    private var _sensorFrequency: Long = runBlocking {
+        repo.sensorFrequency.first()
+    }
     @get:Bindable
-    var frequency: String
-        get() = (repo.frequency.value ?: DEFAULT_FREQUENCY).toString()
+    var sensorFrequency: String
+        get() = _sensorFrequency.toString()
         set(value) {
             if (value.isEmpty()) {
                 return;
             }
-            repo.setFrequency(value.toLong())
-            notifyPropertyChanged(BR.frequency)
+            _sensorFrequency = value.toLong()
+            notifyPropertyChanged(BR.sensorFrequency)
+            CoroutineScope(Dispatchers.IO).launch {
+                repo.setSensorFrequency(value.toLong())
+            }
+        }
+
+    private var _sendFrequency: Long = runBlocking {
+        repo.sendFrequency.first()
+    }
+    @get:Bindable
+    var sendFrequency: String
+        get() = _sendFrequency.toString()
+        set(value) {
+            if (value.isEmpty()) {
+                return;
+            }
+            _sendFrequency = value.toLong()
+            notifyPropertyChanged(BR.sendFrequency)
+            CoroutineScope(Dispatchers.IO).launch {
+                repo.setSendFrequency(value.toLong())
+            }
         }
 
     @get:Bindable

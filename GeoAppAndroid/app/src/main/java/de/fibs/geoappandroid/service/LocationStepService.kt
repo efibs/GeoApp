@@ -14,6 +14,7 @@ import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -22,14 +23,14 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import de.fibs.geoappandroid.R
 import de.fibs.geoappandroid.models.Datapoint
-import de.fibs.geoappandroid.repo.DataRepository
-import de.fibs.geoappandroid.repo.DataRepository.Companion.DEFAULT_FREQUENCY
+import de.fibs.geoappandroid.repo.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -38,13 +39,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.OffsetDateTime
 import java.util.Date
-import java.util.concurrent.ConcurrentLinkedQueue
 
 class LocationStepService : LifecycleService(), SensorEventListener {
 
     //region Private fields
 
-    private val repo = DataRepository.getInstance()
+    private val repo = SettingsRepository.getInstance(null)
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
     private lateinit var sensorManager: SensorManager
@@ -53,7 +53,14 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     private val scope = CoroutineScope(Dispatchers.Main)
     private val dataQueueLock = Any()
     private val dataQueue = ArrayList<Datapoint>(repo.bufferSize)
-    private var loopJob: Job? = null
+    private var sendDataJob: Job? = null
+    private var isSendingData = true
+    private var sendFrequency: Long = runBlocking {
+        repo.sendFrequency.first()
+    }
+    private var sensorFrequency: Long = runBlocking {
+        repo.sensorFrequency.first()
+    }
 
     //endregion
 
@@ -78,49 +85,75 @@ class LocationStepService : LifecycleService(), SensorEventListener {
         }
 
         // Observe frequency change
-        repo.frequency.observe(this) { stopLocationUpdates(); startLocationUpdates() }
+        lifecycleScope.launch {
+            repo.sensorFrequency.collect { newSensorFrequency ->
+                sensorFrequency = newSensorFrequency
+                if (repo.collecting.value == true) {
+                    stopLocationUpdates()
+                    startLocationUpdates()
+                }}
+        }
+        lifecycleScope.launch {
+            repo.sendFrequency.collect { newSendFrequency ->
+                sendFrequency = newSendFrequency
+            }
+        }
 
         // Observe collecting change
         repo.collecting.observe(this) {
             if (repo.collecting.value == true) {
-                scheduleUpdates()
+                scheduleSensorUpdates()
+                startSending()
             } else {
-                stopUpdates()
+                stopSensorUpdates()
+                stopSending()
             }
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        stopUpdates()
+        stopSensorUpdates()
     }
 
     //endregion
 
-    //region Worker coroutine
+    //region Data sending
+
+    private suspend fun processQueue() {
+        while (isSendingData || dataQueue.isNotEmpty()) {
+            delay(sendFrequency * 1000)
+            trySendUpdate()
+        }
+    }
+
+    private fun startSending() {
+        sendDataJob?.cancel()
+        isSendingData = true
+        sendDataJob = scope.launch(Dispatchers.Default) {
+            processQueue()
+        }
+    }
+
+    private fun stopSending() {
+        isSendingData = false
+    }
+
+    //endregion
+
+    //region Sensor updates
 
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
-    private fun scheduleUpdates() {
+    private fun scheduleSensorUpdates() {
         startLocationUpdates()
 
         // Register for step counter updates
         stepSensor?.also { sensor ->
             sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
         }
-
-        loopJob = scope.launch(Dispatchers.Default) {
-           while (isActive) {
-               delay((repo.frequency.value ?: DEFAULT_FREQUENCY) * 1000)
-               if (repo.collecting.value == true) {
-                   sendUpdate()
-               }
-           }
-       }
     }
 
-    private fun stopUpdates() {
-        loopJob?.cancel()
-        loopJob = null
+    private fun stopSensorUpdates() {
         stopLocationUpdates()
         sensorManager.unregisterListener(this)
     }
@@ -129,7 +162,9 @@ class LocationStepService : LifecycleService(), SensorEventListener {
 
     //region Send data
 
-    private suspend fun sendUpdate() {
+    private suspend fun trySendUpdate() {
+        Log.d("GeoApp", "Trying to send data.")
+
         withContext(Dispatchers.IO) {
             try {
                 val url = URL("http://192.168.2.55:8080/api/data/0de65f3f-0e5a-4ace-b4a1-c34b61427e9c")
@@ -178,7 +213,7 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private fun startLocationUpdates() {
         val locationRequest = LocationRequest
-            .Builder(Priority.PRIORITY_HIGH_ACCURACY, (repo.frequency.value ?: DEFAULT_FREQUENCY) * 1000)
+            .Builder(Priority.PRIORITY_HIGH_ACCURACY, sensorFrequency * 1000)
             .setMaxUpdateDelayMillis(500)
             .build()
 
@@ -191,6 +226,8 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     }
 
     fun onLocationChanged(locationResult: LocationResult) {
+        Log.d("GeoApp", "New location received.")
+
         val lastLocation = locationResult.lastLocation ?: return
 
         putDatapointOnQueue(lastLocation)
@@ -243,7 +280,7 @@ class LocationStepService : LifecycleService(), SensorEventListener {
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Tracking Location and Steps")
             .setContentText("Your location and steps are being tracked in the background.")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
 
         return notificationBuilder.build()

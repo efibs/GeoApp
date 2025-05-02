@@ -37,10 +37,10 @@
                 android:orientation="horizontal">
                 <TextView
                     android:id="@+id/editTextText"
-                    android:layout_width="100dp"
+                    android:layout_width="160dp"
                     android:layout_height="wrap_content"
                     android:ems="10"
-                    android:text="Frequency (s)"
+                    android:text="Sensor Frequency (s)"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent" />
                 <EditText
@@ -49,7 +49,31 @@
                     android:layout_height="wrap_content"
                     android:ems="10"
                     android:inputType="number"
-                    android:text="@={viewModel.frequency}"
+                    android:text="@={viewModel.sensorFrequency}"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toEndOf="@+id/editTextText" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/sendFrequencyLabel"
+                    android:layout_width="160dp"
+                    android:layout_height="wrap_content"
+                    android:ems="10"
+                    android:text="Send Frequency (s)"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent" />
+                <EditText
+                    android:id="@+id/sendFrequencyText"
+                    android:layout_width="70dp"
+                    android:layout_height="wrap_content"
+                    android:ems="10"
+                    android:inputType="number"
+                    android:text="@={viewModel.sendFrequency}"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toEndOf="@+id/editTextText" />
