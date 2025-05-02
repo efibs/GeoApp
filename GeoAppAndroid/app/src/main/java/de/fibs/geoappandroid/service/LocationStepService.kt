@@ -132,7 +132,7 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     private suspend fun sendUpdate() {
         withContext(Dispatchers.IO) {
             try {
-                val url = URL("http://192.168.2.55:8080/api/data/8c1c59c5-faaf-42c5-88c6-bf80049f1c0f")
+                val url = URL("http://192.168.2.55:8080/api/data/0de65f3f-0e5a-4ace-b4a1-c34b61427e9c")
 
                 synchronized(dataQueueLock) {
                     val jsonInputString = Json.encodeToString(dataQueue)
@@ -145,7 +145,7 @@ class LocationStepService : LifecycleService(), SensorEventListener {
                     connection.setRequestProperty("Accept", "application/json")
                     connection.setRequestProperty(
                         "Authorization",
-                        "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWRtaW4iLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjhjMWM1OWM1LWZhYWYtNDJjNS04OGM2LWJmODAwNDlmMWMwZiIsIlBlcm1pc3Npb25zIjoiW1wicGVybTpXcml0ZURhdGFcIl0iLCJleHAiOjE3NDgzNTk0NzQsImlzcyI6Ikdlb0FwcCIsImF1ZCI6Ikdlb0FwcCJ9.rNCqpO2Nb5HMG971vHHboTC-r8iMZN4MYukj6EYjhfA"
+                        "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWRtaW4iLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjBkZTY1ZjNmLTBlNWEtNGFjZS1iNGExLWMzNGI2MTQyN2U5YyIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFkbWluaXN0cmF0b3JzIiwiUGVybWlzc2lvbnMiOiJwZXJtOldyaXRlRGF0YSIsImV4cCI6MTc0ODc5OTE4NywiaXNzIjoiR2VvQXBwIiwiYXVkIjoiR2VvQXBwIn0.b0WdnQLo7EJvCfk-r6J4wbtNtyQpUHV4xUpO2VjUro0"
                     )
                     connection.doOutput = true
 

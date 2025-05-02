@@ -26,6 +26,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            manifestPlaceholders["networkSecurityConfig"] = "@xml/network_security_config_prod"
+        }
+
+        debug {
+            manifestPlaceholders["networkSecurityConfig"] = "@xml/network_security_config_dev"
         }
     }
     compileOptions {

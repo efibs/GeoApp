@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext traffic for development (localhost or specific domains) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>  <!-- For local testing -->
+        <domain includeSubdomains="true">192.168.2.55</domain>  <!-- For your dev server -->
+    </domain-config>
+
+    <!-- You can also allow specific domains for cleartext traffic during development -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">kleiner3.ddns.net</domain>
+    </domain-config>
+</network-security-config>
