@@ -125,7 +125,14 @@ using (var scope = app.Services.CreateScope())
         if (await userManager.FindByNameAsync(adminUsername).ConfigureAwait(false) == null)
         {
             var adminUser = new User { UserName = adminUsername };
-            await userManager.CreateAsync(adminUser, config["Admin:Password"]!).ConfigureAwait(false);
+            var createResult = await userManager.CreateAsync(adminUser, config["Admin:Password"]!).ConfigureAwait(false);
+            
+            if (!createResult.Succeeded)
+            {
+                var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
+                throw new Exception($"Failed to create admin user: {errors}");
+            }
+            
             await userManager.AddToRoleAsync(adminUser, Roles.Admin).ConfigureAwait(false);
         }
     }
