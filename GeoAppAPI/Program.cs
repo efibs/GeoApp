@@ -13,6 +13,11 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Test
+Console.WriteLine("JWT Issuer: " + builder.Configuration["Jwt:Issuer"]);
+Console.WriteLine("DB connection string: " + builder.Configuration.GetConnectionString("PostgreSQL"));
+Console.WriteLine("Influx DB: " + builder.Configuration["InfluxDB:Host"]);
+
 // Add services to the container.
 
 builder.Services.AddControllers();
