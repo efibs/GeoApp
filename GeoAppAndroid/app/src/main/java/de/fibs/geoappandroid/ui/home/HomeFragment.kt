@@ -28,6 +28,8 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        val permissionsGiven = checkAndRequestPermissions()
+
         binding = DataBindingUtil.inflate(inflater, R.layout.fragment_home, container, false)
 
         viewModel = HomeViewModel(requireContext())
@@ -38,10 +40,11 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         // This is the first instantiation of the repository. Do not remove.
         SettingsRepository.getInstance(requireContext())
 
-        val serviceIntent = Intent(requireContext(), LocationStepService::class.java)
-        requireContext().startForegroundService(serviceIntent)
-
-        checkAndRequestPermissions()
+        if (permissionsGiven) {
+            // Start the foreground service
+            val serviceIntent = Intent(requireContext(), LocationStepService::class.java)
+            requireContext().startForegroundService(serviceIntent)
+        }
 
         return binding.root
     }
@@ -50,7 +53,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         private const val PERMISSION_REQUEST_CODE = 1
     }
 
-    private fun checkAndRequestPermissions() {
+    private fun checkAndRequestPermissions(): Boolean {
         val requiredPermissions = mutableListOf<String>()
 
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
@@ -71,8 +74,10 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
         if (requiredPermissions.isNotEmpty()) {
             requestPermissions(requiredPermissions.toTypedArray(), PERMISSION_REQUEST_CODE)
+            return false
         } else {
-            // All permissions are granted; proceed with your functionality
+            // All permissions are granted;
+            return true
         }
     }
 
@@ -86,7 +91,9 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             } else true
 
             if (fineLocationGranted && activityRecognitionGranted) {
-                // Permissions granted
+                // Permissions granted; start the foreground service
+                val serviceIntent = Intent(requireContext(), LocationStepService::class.java)
+                requireContext().startForegroundService(serviceIntent)
             } else {
                 Toast.makeText(requireContext(), "App does not function without the requested permissions.", Toast.LENGTH_LONG).show()
             }
