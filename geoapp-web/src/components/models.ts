@@ -42,7 +42,10 @@ export const ClaimTypeUserId: string =
   'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier';
 export const ClaimTypeUsername: string =
   'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name';
+export const ClaimTypeRoles: string =
+  'http://schemas.microsoft.com/ws/2008/06/identity/claims/role';
 
 export const PermissionReadData: string = 'perm:ReadData';
-
 export const PermissionWriteData: string = 'perm:WriteData';
+
+export const RoleAdmin: string = 'Administrators';

@@ -1,22 +1,34 @@
 <template>
-  <q-card class="card">
-    <q-card-section>
-      <div class="text-h6">Generate a token</div>
-    </q-card-section>
-    <q-separator dark inset />
-    <q-card-section class="input-section">
-      <q-checkbox v-model="allSelected">All</q-checkbox>
-      <q-scroll-area class="checkboxes">
-        <q-checkbox v-model="hasReadDataPermission">Read Data</q-checkbox>
-        <q-checkbox v-model="hasWriteDataPermission">Write Data</q-checkbox>
-      </q-scroll-area>
+  <div class="container">
+    <q-card class="card token-card">
+      <q-card-section>
+        <div class="text-h6">Generate a token</div>
+      </q-card-section>
+      <q-separator dark inset />
+      <q-card-section class="input-section">
+        <q-checkbox v-model="allSelected">All</q-checkbox>
+        <q-scroll-area class="checkboxes">
+          <q-checkbox v-model="hasReadDataPermission">Read Data</q-checkbox>
+          <q-checkbox v-model="hasWriteDataPermission">Write Data</q-checkbox>
+        </q-scroll-area>
 
-      <q-input v-model="tokenExpiryString" filled label="Expiry" style="margin-bottom: 10px">
-        <q-tooltip anchor="top left" self="center left"> dd.HH:mm:ss </q-tooltip>
-      </q-input>
-      <q-btn @click="generateToken" color="primary" class="gen-btn">Generate</q-btn>
-    </q-card-section>
-  </q-card>
+        <q-input v-model="tokenExpiryString" filled label="Expiry" style="margin-bottom: 10px">
+          <q-tooltip anchor="top left" self="center left"> dd.HH:mm:ss </q-tooltip>
+        </q-input>
+        <q-btn @click="generateToken" color="primary" class="gen-btn">Generate</q-btn>
+      </q-card-section>
+    </q-card>
+
+    <q-card v-if="isAdmin" class="card register-token-card">
+      <q-card-section>
+        <div class="text-h6">Generate a register token</div>
+      </q-card-section>
+      <q-separator dark inset />
+      <q-card-section class="input-section">
+        <q-btn @click="generateRegisterToken" color="primary" class="gen-btn">Generate</q-btn>
+      </q-card-section>
+    </q-card>
+  </div>
 
   <q-dialog v-model="showToken">
     <q-card>
@@ -53,7 +65,7 @@ import {
 import { useAuthStore } from 'src/stores/authStore';
 import { computed, ref } from 'vue';
 
-const { userId } = useAuthStore();
+const { userId, isAdmin } = useAuthStore();
 
 const showToken = ref(false);
 const token = ref<string>('');
@@ -109,6 +121,14 @@ const generateToken = async () => {
   showToken.value = true;
 };
 
+const generateRegisterToken = async () => {
+  const response = await api.post<JwtToken>(`/users/tokens/register`);
+
+  token.value = response.data.token;
+
+  showToken.value = true;
+};
+
 const copyToken = async () => {
   await copyToClipboard(token.value);
 };
@@ -119,6 +139,18 @@ const closeTokenPopup = () => {
 };
 </script>
 <style scoped>
+.container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  gap: 15px;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  overflow-y: scroll;
+}
+
 .input-section {
   display: flex;
   flex-direction: column;
@@ -129,20 +161,23 @@ const closeTokenPopup = () => {
   display: flex;
   flex-grow: 1;
   padding-bottom: 10px;
+  min-height: 50px;
 }
 
 .card {
-  width: 600px;
-  height: 400px;
   margin: 0;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  -ms-transform: translate(-50%, -50%);
-  transform: translate(-50%, -50%);
   filter: drop-shadow(7px 7px 5px rgba(0, 0, 0, 0.6));
   display: flex;
   flex-direction: column;
+}
+
+.register-token-card {
+  width: 50%;
+}
+
+.token-card {
+  height: 400px;
+  width: 50%;
 }
 
 .gen-btn {

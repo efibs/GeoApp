@@ -11,20 +11,13 @@ public class PermissionRequirementHandler : AuthorizationHandler<PermissionRequi
         var requirements = context.Requirements;
         
         // Find the permissions
-        var permissionsString = context.User.FindFirst(c => c.Type == Permissions.PermissionClaimType)?.Value;
+        var userPermissions = context.User
+            .FindAll(c => c.Type == Permissions.PermissionClaimType)
+            .Select(c => c.Value)
+            .ToList();
         
         // If the token doesn't have the permissions claim
-        if (string.IsNullOrWhiteSpace(permissionsString))
-        {
-            context.Fail(new AuthorizationFailureReason(this, "User token has no permissions"));
-            return Task.CompletedTask;
-        }
-
-        // Parse to list of strings
-        var userPermissions = JsonSerializer.Deserialize<string[]>(permissionsString);
-
-        // If the token doesn't have the permissions claim
-        if (userPermissions == null)
+        if (userPermissions.Count == 0)
         {
             context.Fail(new AuthorizationFailureReason(this, "Permissions in user token could not be parsed"));
             return Task.CompletedTask;

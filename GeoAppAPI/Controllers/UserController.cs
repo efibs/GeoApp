@@ -17,6 +17,7 @@ public class UserController(IConfiguration config, UserManager<User> userManager
     : ControllerBase
 {
     [HttpPost]
+    [Authorize(Permissions.Register)]
     public async Task<ActionResult<JwtTokenDto>> RegisterUser([FromBody] RegisterDto registerDto, CancellationToken cancellationToken = default)
     {
         var user = new User
@@ -36,7 +37,8 @@ public class UserController(IConfiguration config, UserManager<User> userManager
             return StatusCode(500);
         }
 
-        var token = _generateJSONWebToken(createdUser, TimeSpan.FromHours(2), Permissions.All);
+        var token = await _generateJSONWebTokenAsync(createdUser, TimeSpan.FromHours(2), Permissions.All)
+            .ConfigureAwait(false);
 
         return Ok(new JwtTokenDto { Token = token });
     }
@@ -59,7 +61,8 @@ public class UserController(IConfiguration config, UserManager<User> userManager
             return Unauthorized();
         }
 
-        var token = _generateJSONWebToken(user, TimeSpan.FromHours(2), Permissions.All);
+        var token = await _generateJSONWebTokenAsync(user, TimeSpan.FromHours(2), Permissions.All)
+            .ConfigureAwait(false);
 
         return Ok(new JwtTokenDto { Token = token });
     }
@@ -90,33 +93,72 @@ public class UserController(IConfiguration config, UserManager<User> userManager
             return Unauthorized();
         }
 
-        if (generateTokenDto.Permissions.Any(p => p is Permissions.All or Permissions.GenerateToken) ||
+        if (generateTokenDto.Permissions.Any(p => p is Permissions.All or Permissions.GenerateToken or Permissions.Register) ||
             generateTokenDto.Expiry > TimeSpan.FromDays(365))
         {
             return BadRequest();
         }
 
-        var token = _generateJSONWebToken(user, generateTokenDto.Expiry, generateTokenDto.Permissions);
+        var token = await _generateJSONWebTokenAsync(user, generateTokenDto.Expiry, generateTokenDto.Permissions)
+            .ConfigureAwait(false);
+
+        return Ok(new JwtTokenDto { Token = token });
+    }
+    
+    [HttpPost]
+    [Route("tokens/register")]
+    [Authorize(Roles = Roles.Admin)]
+    public ActionResult<JwtTokenDto> GenerateToken(CancellationToken cancellationToken = default)
+    {
+        var token = _generateRegisterToken();
 
         return Ok(new JwtTokenDto { Token = token });
     }
 
-    private string _generateJSONWebToken(User userInfo, TimeSpan expiry, params string[] permissions)
+    private async Task<string> _generateJSONWebTokenAsync(User userInfo, TimeSpan expiry, params string[] permissions)
+    {
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+        
+        var roles = await userManager.GetRolesAsync(userInfo).ConfigureAwait(false);
+        
+        var roleClaims = roles.Select(r => new Claim(ClaimTypes.Role, r));
+        var permissionClaims = permissions.Select(p => new Claim(Permissions.PermissionClaimType, p));
+        
+        var userClaims = new List<Claim>
+        {
+            new Claim(ClaimTypes.Name, userInfo.UserName!),
+            new Claim(ClaimTypes.NameIdentifier, userInfo.Id),
+        };
+
+        var claims = userClaims
+            .Union(roleClaims)
+            .Union(permissionClaims)
+            .ToList();
+        
+        var token = new JwtSecurityToken(config["Jwt:Issuer"],
+            config["Jwt:Issuer"],
+            claims,
+            expires: DateTime.Now.Add(expiry),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private string _generateRegisterToken()
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.Name, userInfo.UserName!),
-            new Claim(ClaimTypes.NameIdentifier, userInfo.Id),
-            new Claim(Permissions.PermissionClaimType, JsonSerializer.Serialize(permissions))
+            new Claim(Permissions.PermissionClaimType, Permissions.Register)
         };
 
         var token = new JwtSecurityToken(config["Jwt:Issuer"],
             config["Jwt:Issuer"],
             claims,
-            expires: DateTime.Now.Add(expiry),
+            expires: DateTime.Now.Add(TimeSpan.FromMinutes(30)),
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
