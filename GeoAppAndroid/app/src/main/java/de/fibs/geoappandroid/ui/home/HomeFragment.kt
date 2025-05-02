@@ -3,6 +3,7 @@ package de.fibs.geoappandroid.ui.home
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -51,9 +52,15 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             requiredPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
 
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACTIVITY_RECOGNITION)
-            != PackageManager.PERMISSION_GRANTED) {
-            requiredPermissions.add(Manifest.permission.ACTIVITY_RECOGNITION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(
+                    requireContext(),
+                    Manifest.permission.ACTIVITY_RECOGNITION
+                )
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                requiredPermissions.add(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
         }
 
         if (requiredPermissions.isNotEmpty()) {
@@ -67,11 +74,14 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST_CODE) {
             val perms = permissions.zip(grantResults.toTypedArray()).toMap()
-            if (perms[Manifest.permission.ACCESS_FINE_LOCATION] == PackageManager.PERMISSION_GRANTED &&
-                perms[Manifest.permission.ACTIVITY_RECOGNITION] == PackageManager.PERMISSION_GRANTED) {
-                // Permissions granted; proceed with your functionality
+            val fineLocationGranted = perms[Manifest.permission.ACCESS_FINE_LOCATION] == PackageManager.PERMISSION_GRANTED
+            val activityRecognitionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                perms[Manifest.permission.ACTIVITY_RECOGNITION] == PackageManager.PERMISSION_GRANTED
+            } else true
+
+            if (fineLocationGranted && activityRecognitionGranted) {
+                // Permissions granted
             } else {
-                // Permissions denied; inform the user that the app cannot function without these permissions
                 Toast.makeText(requireContext(), "App does not function without the requested permissions.", Toast.LENGTH_LONG).show()
             }
         }
