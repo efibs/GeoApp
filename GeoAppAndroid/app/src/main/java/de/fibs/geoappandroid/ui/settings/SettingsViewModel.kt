@@ -51,6 +51,8 @@ class SettingsViewModel(context: Context) : BaseObservable()  {
                 notifyPropertyChanged(BR.apiSendDataToken)
                 notifyPropertyChanged(BR.tokenExpirationDate)
                 notifyPropertyChanged(BR.tokenIsExpired)
+                notifyPropertyChanged(BR.tokenHasNecessaryRights)
+                notifyPropertyChanged(BR.tokenHasNecessaryRightsText)
             }
         }
 
@@ -78,5 +80,21 @@ class SettingsViewModel(context: Context) : BaseObservable()  {
     var tokenIsExpired: Boolean = false
         get() = runBlocking {
             repo.tokenIsExpired.first()
+        }
+
+    @get:Bindable
+    var tokenHasNecessaryRights: Boolean = false
+        get() = runBlocking {
+            repo.tokenHasWritePermission.first()
+        }
+
+    @get:Bindable
+    var tokenHasNecessaryRightsText: String = "No"
+        get() {
+            val hasRights = runBlocking {
+                repo.tokenHasWritePermission.first()
+            }
+
+            return if (hasRights) "Yes" else "No"
         }
 }

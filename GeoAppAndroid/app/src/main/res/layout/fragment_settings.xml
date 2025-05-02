@@ -91,6 +91,30 @@
                     app:layout_constraintStart_toEndOf="@+id/editTextText"
                     app:booleanColor="@{viewModel.tokenIsExpired}"/>
             </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/tokenRightsLabel"
+                    android:layout_width="110dp"
+                    android:layout_height="wrap_content"
+                    android:ems="10"
+                    android:text="Token has permissions: "
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent" />
+                <TextView
+                    android:id="@+id/tokenRightsText"
+                    android:layout_width="270dp"
+                    android:layout_height="wrap_content"
+                    android:ems="10"
+                    android:text="@={viewModel.tokenHasNecessaryRightsText}"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toEndOf="@+id/editTextText"
+                    app:booleanColor="@{viewModel.tokenHasNecessaryRights}"/>
+            </LinearLayout>
         </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

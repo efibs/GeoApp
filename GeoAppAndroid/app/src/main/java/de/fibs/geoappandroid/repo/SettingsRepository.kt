@@ -39,6 +39,16 @@ class SettingsRepository private constructor(private val context: Context) {
             }
         }
 
+    val tokenHasWritePermission: Flow<Boolean> = token
+        .map { token ->
+            try {
+                getHasWritePermission(token)
+            } catch (e: Exception) {
+                Log.e("GeoApp", "Error while decoding token", e)
+                false
+            }
+        }
+
     val tokenExpirationDate: Flow<Date?> = token
         .map { token ->
             try {
@@ -125,10 +135,28 @@ class SettingsRepository private constructor(private val context: Context) {
     }
 
     private fun getExpiration(token: String): Date {
-        var expirationClaimKey = "exp"
-        var expirationString = getClaim(token, expirationClaimKey)
-        var expirationDate = Date((expirationString?.asLong() ?: 0) * 1000)
+        val expirationClaimKey = "exp"
+        val expirationClaim = getClaim(token, expirationClaimKey)
+        val expirationDate = Date((expirationClaim?.asLong() ?: 0) * 1000)
         return expirationDate
+    }
+
+    private fun getHasWritePermission(token: String): Boolean {
+        val permissionsClaimKey = "Permissions"
+        val writePermission = "perm:WriteData"
+        val permissionsClaim = getClaim(token, permissionsClaimKey)
+
+        val hasWritePermission = when {
+            permissionsClaim?.asString() != null -> {
+                permissionsClaim.asString() == writePermission
+            }
+            permissionsClaim?.asList(String::class.java) != null -> {
+                permissionsClaim.asList(String::class.java).contains(writePermission)
+            }
+            else -> false
+        }
+
+        return hasWritePermission
     }
 
     companion object {
