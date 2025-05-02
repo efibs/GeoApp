@@ -2,6 +2,7 @@ package de.fibs.geoappandroid
 
 import android.os.Bundle
 import android.view.Menu
+import android.view.MenuItem
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.navigation.NavigationView
 import androidx.navigation.findNavController
@@ -12,6 +13,7 @@ import androidx.navigation.ui.setupWithNavController
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.appcompat.app.AppCompatActivity
 import de.fibs.geoappandroid.databinding.ActivityMainBinding
+import de.fibs.geoappandroid.ui.settings.SettingsFragment
 
 class MainActivity : AppCompatActivity() {
 
@@ -49,5 +51,18 @@ class MainActivity : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         val navController = findNavController(R.id.nav_host_fragment_content_main)
         return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_settings -> {
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.nav_host_fragment_content_main, SettingsFragment())
+                    .addToBackStack(null) // Optional
+                    .commit()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 }

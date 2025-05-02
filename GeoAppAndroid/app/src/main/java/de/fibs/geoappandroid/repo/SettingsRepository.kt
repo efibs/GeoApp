@@ -1,6 +1,7 @@
 package de.fibs.geoappandroid.repo
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.preferences.core.*
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -8,6 +9,7 @@ import de.fibs.geoappandroid.datastore.dataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.Date
+import com.auth0.jwt.JWT
 
 class SettingsRepository private constructor(private val context: Context) {
 
@@ -26,9 +28,19 @@ class SettingsRepository private constructor(private val context: Context) {
         }
     }
 
+    val userId: Flow<String> = token
+        .map { token ->
+            try {
+                getUserId(token)
+            } catch (e: Exception) {
+                Log.e("GeoApp", "Error while decoding token", e)
+                ""
+            }
+        }
+
     val apiEndpoint: Flow<String> = context.dataStore.data
         .map {preferences ->
-            preferences[API_ENDPOINT_KEY] ?: ""
+            preferences[API_ENDPOINT_KEY] ?: DEFAULT_API_ENDPOINT
         }
     suspend fun setApiEndpoint(endpoint: String) {
         context.dataStore.edit { preferences ->
@@ -78,6 +90,20 @@ class SettingsRepository private constructor(private val context: Context) {
         _lastUpdateTime.postValue(newDate)
     }
 
+    private fun getUserId(token: String): String {
+        val userIdClaimKey = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+
+        val decodedJWT = JWT.decode(token)
+
+        val userIdClaim = decodedJWT.getClaim(userIdClaimKey) ?: throw Exception("Invalid token provided")
+
+        return userIdClaim.asString()
+    }
+
+    init {
+
+    }
+
     companion object {
         @Volatile
         private var INSTANCE: SettingsRepository? = null
@@ -93,5 +119,6 @@ class SettingsRepository private constructor(private val context: Context) {
 
         const val DEFAULT_SENSOR_FREQUENCY = 10L
         const val DEFAULT_SEND_FREQUENCY = 40L
+        const val DEFAULT_API_ENDPOINT = "https://kleiner3.ddns.net:1169"
     }
 }

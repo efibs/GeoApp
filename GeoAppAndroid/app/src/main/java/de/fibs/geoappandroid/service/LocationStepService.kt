@@ -61,6 +61,15 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     private var sensorFrequency: Long = runBlocking {
         repo.sensorFrequency.first()
     }
+    private var apiEndpoint: String = runBlocking {
+        repo.apiEndpoint.first()
+    }
+    private var sendToken: String = runBlocking {
+        repo.token.first()
+    }
+    private var userId: String = runBlocking {
+        repo.userId.first()
+    }
 
     //endregion
 
@@ -96,6 +105,23 @@ class LocationStepService : LifecycleService(), SensorEventListener {
         lifecycleScope.launch {
             repo.sendFrequency.collect { newSendFrequency ->
                 sendFrequency = newSendFrequency
+            }
+        }
+
+        // Observer api stuff
+        lifecycleScope.launch {
+            repo.apiEndpoint.collect{ newApiEndpoint ->
+                apiEndpoint = newApiEndpoint
+            }
+        }
+        lifecycleScope.launch {
+            repo.token.collect{ newSendToken ->
+                sendToken = newSendToken
+            }
+        }
+        lifecycleScope.launch {
+            repo.userId.collect{newUserId ->
+                userId = newUserId
             }
         }
 
@@ -167,7 +193,9 @@ class LocationStepService : LifecycleService(), SensorEventListener {
 
         withContext(Dispatchers.IO) {
             try {
-                val url = URL("http://192.168.2.55:8080/api/data/0de65f3f-0e5a-4ace-b4a1-c34b61427e9c")
+                val url = URL("${apiEndpoint}/api/data/${userId}")
+
+                Log.d("GeoApp", "Sending to $url with token: $sendToken")
 
                 synchronized(dataQueueLock) {
                     val jsonInputString = Json.encodeToString(dataQueue)
@@ -180,7 +208,7 @@ class LocationStepService : LifecycleService(), SensorEventListener {
                     connection.setRequestProperty("Accept", "application/json")
                     connection.setRequestProperty(
                         "Authorization",
-                        "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWRtaW4iLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjBkZTY1ZjNmLTBlNWEtNGFjZS1iNGExLWMzNGI2MTQyN2U5YyIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFkbWluaXN0cmF0b3JzIiwiUGVybWlzc2lvbnMiOiJwZXJtOldyaXRlRGF0YSIsImV4cCI6MTc0ODc5OTE4NywiaXNzIjoiR2VvQXBwIiwiYXVkIjoiR2VvQXBwIn0.b0WdnQLo7EJvCfk-r6J4wbtNtyQpUHV4xUpO2VjUro0"
+                        "Bearer $sendToken"
                     )
                     connection.doOutput = true
 
