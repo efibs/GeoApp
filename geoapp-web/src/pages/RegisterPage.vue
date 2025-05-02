@@ -33,6 +33,14 @@
           >
           </q-input>
 
+          <q-input
+            v-model="registerToken"
+            type="password"
+            label="register token"
+            :rules="registerTokenRules"
+          >
+          </q-input>
+
           <q-btn color="primary" type="submit" class="full-width register-button">Register</q-btn>
         </q-form>
       </q-card-section>
@@ -63,6 +71,7 @@ const { popupShowing: errorShowing, showPopup: showError } = usePopupTimer(10000
 const username = ref();
 const password = ref();
 const passwordRepeat = ref();
+const registerToken = ref();
 const isPwd = ref(true);
 const errorMessage = ref<string>();
 
@@ -76,6 +85,9 @@ const passwordRepeatRules: ValidationRule[] = [
   (val) => (val && val.length > 0) || 'Password cannot be empty.',
   () => password.value == passwordRepeat.value || 'Password not the same.',
 ];
+const registerTokenRules: ValidationRule[] = [
+  (val) => (val && val.length > 0) || 'Register token cannot be empty.',
+];
 
 const register = async () => {
   const register: Register = {
@@ -84,14 +96,20 @@ const register = async () => {
   };
 
   try {
-    await authStore.registerAsync(register);
+    await authStore.registerAsync(register, registerToken.value);
     await router.push('/');
   } catch (error) {
     console.error(error);
-    if (error instanceof AxiosError && error.response?.status == 400) {
-      const valErrors: ValidationErorr[] = error.response?.data;
+    if (error instanceof AxiosError) {
+      if (error.response?.status == 400) {
+        const valErrors: ValidationErorr[] = error.response?.data;
 
-      errorMessage.value = valErrors.map((e) => e.description).join(' ');
+        errorMessage.value = valErrors.map((e) => e.description).join(' ');
+      } else if (error.response?.status == 401) {
+        errorMessage.value = 'Invalid register token';
+      } else {
+        errorMessage.value = 'Unknown network error';
+      }
     } else {
       errorMessage.value = 'Unknown error';
     }

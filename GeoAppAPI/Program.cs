@@ -95,15 +95,39 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<UserDbContext>();
+    var services = scope.ServiceProvider;
+    
     try
     {
+        var dbContext = services.GetRequiredService<UserDbContext>();
+        var userManager = services.GetRequiredService<UserManager<User>>();
+        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+        var config = services.GetRequiredService<IConfiguration>();
+        
         dbContext.Database.Migrate();
+        
+        // Seed the roles
+        foreach (var role in Roles.AvailableRoles)
+        {
+            if (!await roleManager.RoleExistsAsync(role).ConfigureAwait(false))
+            {
+                await roleManager.CreateAsync(new IdentityRole(role)).ConfigureAwait(false);
+            }
+        }
+        
+        // If the admin does not exist
+        var adminUsername = config["Admin:Username"]!;
+        if (await userManager.FindByNameAsync(adminUsername).ConfigureAwait(false) == null)
+        {
+            var adminUser = new User { UserName = adminUsername };
+            await userManager.CreateAsync(adminUser, config["Admin:Password"]!).ConfigureAwait(false);
+            await userManager.AddToRoleAsync(adminUser, Roles.Admin).ConfigureAwait(false);
+        }
     }
     catch (Exception ex)
     {
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while migrating the database.");
+        logger.LogError(ex, "An error occurred while seeding the database.");
         throw;
     }
 }
