@@ -180,6 +180,28 @@ const closeTokenPopup = () => {
   width: 50%;
 }
 
+@media screen and (max-width: 600px) {
+  .register-token-card {
+    width: 75%;
+  }
+
+  .token-card {
+    height: 400px;
+    width: 75%;
+  }
+}
+
+@media screen and (max-width: 400px) {
+  .register-token-card {
+    width: 100%;
+  }
+
+  .token-card {
+    height: 400px;
+    width: 100%;
+  }
+}
+
 .gen-btn {
   width: 100%;
 }
