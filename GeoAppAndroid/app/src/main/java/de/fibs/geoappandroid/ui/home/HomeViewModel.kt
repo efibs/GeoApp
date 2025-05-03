@@ -57,7 +57,7 @@ class HomeViewModel(context: Context) : BaseObservable() {
         get() = _sendFrequency.toString()
         set(value) {
             if (value.isEmpty()) {
-                return;
+                return
             }
             _sendFrequency = value.toLong()
             notifyPropertyChanged(BR.sendFrequency)
@@ -65,6 +65,55 @@ class HomeViewModel(context: Context) : BaseObservable() {
                 repo.setSendFrequency(value.toLong())
             }
         }
+
+    @get:Bindable
+    var connectTimeoutText: String
+        get() = repo.httpClientConnectTimeoutMillis.value.toString()
+        set(value) {
+            if (value.isBlank()) {
+                return
+            }
+            val lVal = value.toLong()
+            if (lVal == repo.httpClientConnectTimeoutMillis.value) {
+                return
+            }
+            repo.setHttpClientConnectTimeoutMillis(lVal)
+            notifyPropertyChanged(BR.connectTimeoutText)
+        }
+
+    @get:Bindable
+    var writeTimeoutText: String
+        get() = repo.httpClientWriteTimeoutMilliseconds.value.toString()
+        set(value) {
+            if (value.isBlank()) {
+                return
+            }
+            val lVal = value.toLong()
+            if (lVal == repo.httpClientWriteTimeoutMilliseconds.value) {
+                return
+            }
+            repo.setHttpClientWriteTimeoutMillis(lVal)
+            notifyPropertyChanged(BR.writeTimeoutText)
+        }
+
+    @get:Bindable
+    var readTimeoutText: String
+        get() = repo.httpClientReadTimeoutMilliseconds.value.toString()
+        set(value) {
+            if (value.isBlank()) {
+                return
+            }
+            val lVal = value.toLong()
+            if (lVal == repo.httpClientReadTimeoutMilliseconds.value) {
+                return
+            }
+            repo.setHttpClientReadTimeoutMillis(lVal)
+            notifyPropertyChanged(BR.readTimeoutText)
+        }
+
+    @get:Bindable
+    val sendErrorText: String
+        get() = repo.sendErrorText.value?.toString() ?: "---"
 
     @get:Bindable
     val bufferCurrent = repo.currentBufferSize
@@ -96,6 +145,10 @@ class HomeViewModel(context: Context) : BaseObservable() {
 
         repo.lastRequestDurationMilliseconds.observeForever{
             notifyPropertyChanged(BR.lastRequestDurationText)
+        }
+
+        repo.sendErrorText.observeForever{
+            notifyPropertyChanged(BR.sendErrorText)
         }
     }
 }

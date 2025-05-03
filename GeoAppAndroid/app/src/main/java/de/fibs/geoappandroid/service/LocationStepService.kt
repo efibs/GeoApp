@@ -1,7 +1,6 @@
 package de.fibs.geoappandroid.service
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -47,13 +46,14 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.time.OffsetDateTime
 import java.util.Date
 import java.util.concurrent.TimeUnit
+import java.net.SocketTimeoutException
 
 class LocationStepService : LifecycleService(), SensorEventListener {
 
     //region Private fields
 
     private val ongoingTrackNotificationId = 3141
-    private val repo = SettingsRepository.getInstance(null)
+    private lateinit var repo: SettingsRepository
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
     private lateinit var sensorManager: SensorManager
@@ -61,28 +61,18 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     private var lastStepCount: Int? = null
     private val scope = CoroutineScope(Dispatchers.Main)
     private val dataQueueLock = Any()
-    private val dataQueue = ArrayList<Datapoint>(repo.bufferSize)
+    private lateinit var dataQueue: ArrayList<Datapoint>
     private var sendDataJob: Job? = null
     private var isSendingData = true
-    private var sendFrequency: Long = runBlocking {
-        repo.sendFrequency.first()
-    }
-    private var sensorFrequency: Long = runBlocking {
-        repo.sensorFrequency.first()
-    }
-    private var apiEndpoint: String = runBlocking {
-        repo.apiEndpoint.first()
-    }
-    private var sendToken: String = runBlocking {
-        repo.token.first()
-    }
-    private var userId: String = runBlocking {
-        repo.userId.first()
-    }
-    private val httpClient: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(1, TimeUnit.SECONDS)
-        .readTimeout(1, TimeUnit.SECONDS)
-        .writeTimeout(1, TimeUnit.SECONDS)
+    private var sendFrequency: Long = SettingsRepository.DEFAULT_SEND_FREQUENCY
+    private var sensorFrequency: Long = SettingsRepository.DEFAULT_SENSOR_FREQUENCY
+    private lateinit var apiEndpoint: String
+    private lateinit var sendToken: String
+    private lateinit var userId: String
+    private var httpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(SettingsRepository.DEFAULT_CONNECTION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+        .readTimeout(SettingsRepository.DEFAULT_READ_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+        .writeTimeout(SettingsRepository.DEFAULT_WRITE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
         .build()
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
@@ -90,56 +80,15 @@ class LocationStepService : LifecycleService(), SensorEventListener {
 
     //region Android lifecycle
 
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     override fun onCreate() {
         super.onCreate()
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
         // Start foreground service
         val notification = createReadyNotification()
         startForeground(1, notification)
 
-        // Create the location callback
-        locationCallback = object: LocationCallback() {
-            override fun onLocationResult(locationResult: LocationResult) {
-                onLocationChanged(locationResult)
-            }
-        }
-
-        // Observe frequency change
-        lifecycleScope.launch {
-            repo.sensorFrequency.collect { newSensorFrequency ->
-                sensorFrequency = newSensorFrequency
-                if (repo.collecting.value == true) {
-                    stopLocationUpdates()
-                    startLocationUpdates()
-                }}
-        }
-        lifecycleScope.launch {
-            repo.sendFrequency.collect { newSendFrequency ->
-                sendFrequency = newSendFrequency
-            }
-        }
-
-        // Observer api stuff
-        lifecycleScope.launch {
-            repo.apiEndpoint.collect{ newApiEndpoint ->
-                apiEndpoint = newApiEndpoint
-            }
-        }
-        lifecycleScope.launch {
-            repo.token.collect{ newSendToken ->
-                sendToken = newSendToken
-            }
-        }
-        lifecycleScope.launch {
-            repo.userId.collect{newUserId ->
-                userId = newUserId
-            }
-        }
+        initProperties()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(
@@ -149,18 +98,7 @@ class LocationStepService : LifecycleService(), SensorEventListener {
             )
         }
 
-        // Observe collecting change
-        repo.collecting.observe(this) {
-            if (repo.collecting.value == true) {
-                scheduleSensorUpdates()
-                startSending()
-                sendPollingNotification()
-            } else {
-                stopSensorUpdates()
-                stopSending()
-                removePollingNotification()
-            }
-        }
+        listenToRepoChanges()
     }
 
     override fun onDestroy() {
@@ -241,17 +179,24 @@ class LocationStepService : LifecycleService(), SensorEventListener {
                             if (response.isSuccessful) {
                                 dataQueue.clear()
                                 repo.setCurrentBufferSize(0)
+                                repo.setSendErrorText(null)
                             } else {
+                                repo.setSendErrorText(response.message)
                                 Log.e("GeoApp", "Request failed. Status code: ${response.code}")
                             }
                         }
+                    } catch (tex: SocketTimeoutException) {
+                        repo.setSendErrorText(tex.cause?.message ?: tex.message)
+                        Log.e("GeoApp", "Failed to send request due to timeout.", tex)
                     } catch (ex: Exception) {
+                        repo.setSendErrorText(ex.message)
                         Log.e("GeoApp", "Failed to send request due to network error.", ex)
                     }
                     val endTime = System.currentTimeMillis()
                     repo.setLastRequestDurationMillis(endTime - startTime)
                 }
             } catch (ex: Exception) {
+                repo.setSendErrorText(ex.message)
                 Log.e("GeoApp", "Failed to send request.", ex)
             }
         }
@@ -364,6 +309,139 @@ class LocationStepService : LifecycleService(), SensorEventListener {
             .setSmallIcon(R.mipmap.ic_launcher)
 
         return notificationBuilder.build()
+    }
+
+    //endregion
+
+    //region Http client
+
+    private fun updateHttpClient(connectTimeoutMillis: Long, readTimeoutMillis: Long, writeTimeoutMillis: Long) {
+        val oldClient = httpClient
+
+        val newClient = oldClient.newBuilder()
+            .connectTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS)
+            .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
+            .writeTimeout(writeTimeoutMillis, TimeUnit.MILLISECONDS)
+            .build()
+
+        httpClient = newClient
+
+        oldClient.dispatcher.executorService.shutdown()
+        oldClient.connectionPool.evictAll()
+        oldClient.cache?.close()
+
+        Log.d("GeoApp", "HTTP Client changed: connectTimeout=$connectTimeoutMillis writeTimeout=$writeTimeoutMillis readTimeout=$readTimeoutMillis")
+    }
+
+    //endregion
+
+    //region Repo changes
+
+    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
+    private fun listenToRepoChanges() {
+        // Observe frequency change
+        lifecycleScope.launch {
+            repo.sensorFrequency.collect { newSensorFrequency ->
+                sensorFrequency = newSensorFrequency
+                if (repo.collecting.value == true) {
+                    stopLocationUpdates()
+                    startLocationUpdates()
+                }}
+        }
+        lifecycleScope.launch {
+            repo.sendFrequency.collect { newSendFrequency ->
+                sendFrequency = newSendFrequency
+            }
+        }
+
+        // Observer api stuff
+        lifecycleScope.launch {
+            repo.apiEndpoint.collect{ newApiEndpoint ->
+                apiEndpoint = newApiEndpoint
+            }
+        }
+        lifecycleScope.launch {
+            repo.token.collect{ newSendToken ->
+                sendToken = newSendToken
+            }
+        }
+        lifecycleScope.launch {
+            repo.userId.collect{newUserId ->
+                userId = newUserId
+            }
+        }
+
+        // Observe collecting change
+        repo.collecting.observe(this) {
+            if (repo.collecting.value == true) {
+                scheduleSensorUpdates()
+                startSending()
+                sendPollingNotification()
+            } else {
+                stopSensorUpdates()
+                stopSending()
+                removePollingNotification()
+            }
+        }
+
+        // Observe timeout changes
+        repo.httpClientConnectTimeoutMillis.observe(this) {
+            updateHttpClient(
+                repo.httpClientConnectTimeoutMillis.value ?: SettingsRepository.DEFAULT_CONNECTION_TIMEOUT_MILLIS,
+                repo.httpClientReadTimeoutMilliseconds.value ?: SettingsRepository.DEFAULT_READ_TIMEOUT_MILLIS,
+                repo.httpClientWriteTimeoutMilliseconds.value ?: SettingsRepository.DEFAULT_WRITE_TIMEOUT_MILLIS
+            )
+        }
+        repo.httpClientWriteTimeoutMilliseconds.observe(this) {
+            updateHttpClient(
+                repo.httpClientConnectTimeoutMillis.value ?: SettingsRepository.DEFAULT_CONNECTION_TIMEOUT_MILLIS,
+                repo.httpClientReadTimeoutMilliseconds.value ?: SettingsRepository.DEFAULT_READ_TIMEOUT_MILLIS,
+                repo.httpClientWriteTimeoutMilliseconds.value ?: SettingsRepository.DEFAULT_WRITE_TIMEOUT_MILLIS
+            )
+        }
+        repo.httpClientReadTimeoutMilliseconds.observe(this) {
+            updateHttpClient(
+                repo.httpClientConnectTimeoutMillis.value ?: SettingsRepository.DEFAULT_CONNECTION_TIMEOUT_MILLIS,
+                repo.httpClientReadTimeoutMilliseconds.value ?: SettingsRepository.DEFAULT_READ_TIMEOUT_MILLIS,
+                repo.httpClientWriteTimeoutMilliseconds.value ?: SettingsRepository.DEFAULT_WRITE_TIMEOUT_MILLIS
+            )
+        }
+    }
+
+    //endregion
+
+    //region Init properties
+
+    private fun initProperties() {
+        repo = SettingsRepository.getInstance(null)
+
+        sendFrequency = runBlocking {
+            repo.sendFrequency.first()
+        }
+        sensorFrequency = runBlocking {
+            repo.sensorFrequency.first()
+        }
+        apiEndpoint = runBlocking {
+            repo.apiEndpoint.first()
+        }
+        sendToken = runBlocking {
+            repo.token.first()
+        }
+        userId = runBlocking {
+            repo.userId.first()
+        }
+
+        dataQueue = ArrayList(repo.bufferSize)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+        stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+
+        // Create the location callback
+        locationCallback = object: LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                onLocationChanged(locationResult)
+            }
+        }
     }
 
     //endregion

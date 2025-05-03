@@ -123,6 +123,34 @@ class SettingsRepository private constructor(private val context: Context) {
         _lastRequestDurationMilliseconds.postValue(newDuration)
     }
 
+    private val _httpClientConnectTimeoutMillis = MutableLiveData<Long>(1000)
+    val httpClientConnectTimeoutMillis: LiveData<Long> = _httpClientConnectTimeoutMillis
+
+    fun setHttpClientConnectTimeoutMillis(newDuration: Long) {
+        _httpClientConnectTimeoutMillis.postValue(newDuration)
+    }
+
+    private val _httpClientReadTimeoutMilliseconds = MutableLiveData<Long>(1000)
+    val httpClientReadTimeoutMilliseconds: LiveData<Long> = _httpClientReadTimeoutMilliseconds
+
+    fun setHttpClientReadTimeoutMillis(newDuration: Long) {
+        _httpClientReadTimeoutMilliseconds.postValue(newDuration)
+    }
+
+    private val _httpClientWriteTimeoutMilliseconds = MutableLiveData<Long>(1000)
+    val httpClientWriteTimeoutMilliseconds: LiveData<Long> = _httpClientWriteTimeoutMilliseconds
+
+    fun setHttpClientWriteTimeoutMillis(newDuration: Long) {
+        _httpClientWriteTimeoutMilliseconds.postValue(newDuration)
+    }
+
+    private val _sendErrorText = MutableLiveData<String?>(null)
+    val sendErrorText: LiveData<String?> = _sendErrorText
+
+    fun setSendErrorText(newText: String?) {
+        _sendErrorText.postValue(newText)
+    }
+
     private fun getClaim(token: String, claimKey: String): Claim? {
         if (token.isBlank()) {
             return null
@@ -182,5 +210,8 @@ class SettingsRepository private constructor(private val context: Context) {
         const val DEFAULT_SENSOR_FREQUENCY = 10L
         const val DEFAULT_SEND_FREQUENCY = 40L
         const val DEFAULT_API_ENDPOINT = "https://kleiner3.ddns.net:1169"
+        const val DEFAULT_CONNECTION_TIMEOUT_MILLIS = 1000L
+        const val DEFAULT_WRITE_TIMEOUT_MILLIS = 1000L
+        const val DEFAULT_READ_TIMEOUT_MILLIS = 1000L
     }
 }
