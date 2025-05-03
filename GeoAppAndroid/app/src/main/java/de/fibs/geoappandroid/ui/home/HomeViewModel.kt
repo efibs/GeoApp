@@ -80,6 +80,10 @@ class HomeViewModel(context: Context) : BaseObservable() {
     val lastSensorUpdateTimeText: String
         get() = repo.lastSensorUpdateTime.value?.toString() ?: "---"
 
+    @get:Bindable
+    val lastRequestDurationText: String
+        get() = "${repo.lastRequestDurationMilliseconds.value ?: "---"} ms"
+
     init {
         repo.currentBufferSize.observeForever {
             notifyPropertyChanged(BR.bufferCurrent)
@@ -88,6 +92,10 @@ class HomeViewModel(context: Context) : BaseObservable() {
 
         repo.lastSensorUpdateTime.observeForever {
             notifyPropertyChanged(BR.lastSensorUpdateTimeText)
+        }
+
+        repo.lastRequestDurationMilliseconds.observeForever{
+            notifyPropertyChanged(BR.lastRequestDurationText)
         }
     }
 }

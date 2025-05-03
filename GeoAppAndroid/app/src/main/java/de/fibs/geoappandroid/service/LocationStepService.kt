@@ -40,11 +40,13 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.io.OutputStream
-import java.net.HttpURLConnection
-import java.net.URL
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.time.OffsetDateTime
 import java.util.Date
+import java.util.concurrent.TimeUnit
 
 class LocationStepService : LifecycleService(), SensorEventListener {
 
@@ -77,6 +79,12 @@ class LocationStepService : LifecycleService(), SensorEventListener {
     private var userId: String = runBlocking {
         repo.userId.first()
     }
+    private val httpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(1, TimeUnit.SECONDS)
+        .readTimeout(1, TimeUnit.SECONDS)
+        .writeTimeout(1, TimeUnit.SECONDS)
+        .build()
+    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     //endregion
 
@@ -211,41 +219,37 @@ class LocationStepService : LifecycleService(), SensorEventListener {
         Log.d("GeoApp", "Trying to send data.")
 
         withContext(Dispatchers.IO) {
+
             try {
-                val url = URL("${apiEndpoint}/api/data/${userId}")
+                val url = "${apiEndpoint}/api/data/${userId}"
 
                 Log.d("GeoApp", "Sending to $url with token: $sendToken")
 
                 synchronized(dataQueueLock) {
                     val jsonInputString = Json.encodeToString(dataQueue)
+                    val requestBody = jsonInputString.toRequestBody(jsonMediaType)
 
-                    val connection = url.openConnection() as HttpURLConnection
-                    connection.connectTimeout = 1000
-                    connection.readTimeout = 1000
-                    connection.requestMethod = "PUT"
-                    connection.setRequestProperty("Content-Type", "application/json; utf-8")
-                    connection.setRequestProperty("Accept", "application/json")
-                    connection.setRequestProperty(
-                        "Authorization",
-                        "Bearer $sendToken"
-                    )
-                    connection.doOutput = true
+                    val request = Request.Builder()
+                        .url(url)
+                        .put(requestBody)
+                        .addHeader("Authorization", "Bearer $sendToken")
+                        .build()
 
-                    connection.outputStream.use { os: OutputStream ->
-                        val input: ByteArray = jsonInputString.toByteArray(Charsets.UTF_8)
-                        os.write(input, 0, input.size)
+                    val startTime = System.currentTimeMillis()
+                    try {
+                        httpClient.newCall(request).execute().use { response ->
+                            if (response.isSuccessful) {
+                                dataQueue.clear()
+                                repo.setCurrentBufferSize(0)
+                            } else {
+                                Log.e("GeoApp", "Request failed. Status code: ${response.code}")
+                            }
+                        }
+                    } catch (ex: Exception) {
+                        Log.e("GeoApp", "Failed to send request due to network error.", ex)
                     }
-
-                    val responseCode = connection.responseCode
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-                        // Handle success
-                        dataQueue.clear()
-                        repo.setCurrentBufferSize(0)
-                    } else {
-                        // Handle error
-                        Log.e("GeoApp", "Request failed. Status code: $responseCode")
-                    }
-                    connection.disconnect()
+                    val endTime = System.currentTimeMillis()
+                    repo.setLastRequestDurationMillis(endTime - startTime)
                 }
             } catch (ex: Exception) {
                 Log.e("GeoApp", "Failed to send request.", ex)

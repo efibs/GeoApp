@@ -116,6 +116,13 @@ class SettingsRepository private constructor(private val context: Context) {
         _lastUpdateTime.postValue(newDate)
     }
 
+    private val _lastRequestDurationMilliseconds = MutableLiveData<Long?>(null)
+    val lastRequestDurationMilliseconds: LiveData<Long?> = _lastRequestDurationMilliseconds
+
+    fun setLastRequestDurationMillis(newDuration: Long) {
+        _lastRequestDurationMilliseconds.postValue(newDuration)
+    }
+
     private fun getClaim(token: String, claimKey: String): Claim? {
         if (token.isBlank()) {
             return null
