@@ -1,14 +1,32 @@
 <template>
   <LeafletMap :map-data="mapData" :colors="dataColors" />
 
-  <q-footer elevated class="footer bg-grey-8 text-white">
-    <ColorInput v-model="ownColor" label="Own color" />
-    <DateTimePicker v-model="from" label="From" />
-    <DateTimePicker v-model="to" label="To" />
+  <!-- Compact footer with toggle button -->
+  <q-footer elevated class="bg-grey-8 text-white q-pa-sm row justify-between items-center">
+    <div>Options</div>
+    <q-btn flat icon="tune" label="Filters" @click="showDrawer = true" />
   </q-footer>
 
-  <OtherUsersCard v-model="allowedUsers" @add-user="addUser" />
+  <!-- Bottom drawer with input fields -->
+  <q-drawer
+    v-model="showDrawer"
+    side="left"
+    overlay
+    bordered
+    behavior="mobile"
+    class="bg-grey-9 text-white"
+  >
+    <div class="q-pa-md">
+      <div class="q-mb-md text-h6">Filter Settings</div>
+      <div class="column q-gutter-md">
+        <ColorInput v-model="ownColor" label="Own color" dense />
+        <DateTimePicker v-model="from" label="From" dense />
+        <DateTimePicker v-model="to" label="To" dense />
+      </div>
+    </div>
+  </q-drawer>
 
+  <OtherUsersCard v-model="allowedUsers" @add-user="addUser" />
   <AddUserPopup ref="addUserPopup" @user-added="onUserAdded" />
 </template>
 <script lang="ts" setup>
@@ -37,6 +55,7 @@ const allowedUsers = useLocalStorage<OtherUserDataAllowance[]>('allowed-user-dat
 const ownColor = useLocalStorage<string>('own-data-color', '#FF0000');
 const addUserPopup = useTemplateRef('addUserPopup');
 
+const showDrawer = ref(false);
 const from = ref<Date>(date.subtractFromDate(Date.now(), { days: 1 }));
 const to = ref<Date>();
 const mapData = ref<MapDataEntry[]>([]);
