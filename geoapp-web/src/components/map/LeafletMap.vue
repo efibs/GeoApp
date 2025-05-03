@@ -7,13 +7,21 @@
         layer-type="base"
         name="OpenStreetMap"
       />
-      <l-polyline :lat-lngs="points" color="red" :weight="2" line-cap="round" line-join="round" />
-      <l-circle-marker
-        v-for="(point, index) in points"
+      <l-polyline
+        v-for="(mapDataEntry, index) in mapData"
         :key="index"
-        :lat-lng="point"
+        :lat-lngs="mapDataEntry.data"
+        :color="colors[mapDataEntry.userId] ?? 'black'"
+        :weight="2"
+        line-cap="round"
+        line-join="round"
+      />
+      <l-circle-marker
+        v-for="(point, index) in mapPoints"
+        :key="index"
+        :lat-lng="point.data"
         :radius="2"
-        color="red"
+        :color="colors[point.userId] ?? 'black'"
       />
     </l-map>
   </div>
@@ -21,21 +29,25 @@
 <script lang="ts" setup>
 import 'leaflet/dist/leaflet.css';
 import { LMap, LTileLayer, LPolyline, LCircleMarker } from '@vue-leaflet/vue-leaflet';
-import { type Datapoint } from '../models';
+import type { DataColors, MapPoint } from '../models';
+import { type MapDataEntry } from '../models';
 import { useLocalStorage } from '@vueuse/core';
 import { computed } from 'vue';
 
-const { data } = defineProps<{
-  data: Datapoint[];
+const { mapData } = defineProps<{
+  mapData: MapDataEntry[];
+  colors: DataColors;
 }>();
 
 const zoom = useLocalStorage('map-zoom', 2);
 const center = useLocalStorage('map-center', { lat: 0, lng: 0 });
 
-const points = computed(() =>
-  data.map((p) => {
-    return { lat: p.latitude, lng: p.longitude };
-  }),
+const mapPoints = computed<MapPoint[]>(() =>
+  mapData.flatMap((d) =>
+    d.data.map((dp) => {
+      return { data: dp, userId: d.userId };
+    }),
+  ),
 );
 </script>
 <style scoped>

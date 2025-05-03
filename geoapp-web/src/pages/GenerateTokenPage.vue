@@ -57,7 +57,7 @@
 import { copyToClipboard } from 'quasar';
 import { api } from 'src/boot/axios';
 import {
-  type JwtToken,
+  type JwtTokenResponse,
   type GenerateToken,
   PermissionReadData,
   PermissionWriteData,
@@ -114,7 +114,10 @@ const generateToken = async () => {
     permissions: permissions,
   };
 
-  const response = await api.post<JwtToken>(`/users/${nullableUserId}/tokens`, generateToken);
+  const response = await api.post<JwtTokenResponse>(
+    `/users/${nullableUserId}/tokens`,
+    generateToken,
+  );
 
   token.value = response.data.token;
 
@@ -122,7 +125,7 @@ const generateToken = async () => {
 };
 
 const generateRegisterToken = async () => {
-  const response = await api.post<JwtToken>(`/users/tokens/register`);
+  const response = await api.post<JwtTokenResponse>(`/users/tokens/register`);
 
   token.value = response.data.token;
 

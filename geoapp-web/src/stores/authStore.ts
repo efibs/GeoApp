@@ -1,27 +1,21 @@
 import { defineStore } from 'pinia';
-import { useJwt } from '@vueuse/integrations/useJwt';
-import type { JwtToken, Register } from 'src/components/models';
-import {
-  ClaimTypeRoles,
-  ClaimTypeUserId,
-  ClaimTypeUsername,
-  RoleAdmin,
-  type Login,
-} from 'src/components/models';
+import type { JwtTokenResponse, Register, JwtToken } from 'src/components/models';
+import { RoleAdmin, type Login } from 'src/components/models';
 import { useLocalStorage } from '@vueuse/core';
 import { computed } from 'vue';
 import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
 
 export const useAuthStore = defineStore('auth', () => {
   const tokenString = useLocalStorage('jwt-token', '');
-  const jwtToken = useJwt(tokenString);
+  const jwtToken = computed(() => jwtDecode<JwtToken>(tokenString.value));
 
   const isSignedIn = () => {
     if (!(tokenString.value && tokenString.value.length > 0)) {
       return false;
     }
 
-    const expirationNum = jwtToken.payload.value?.exp;
+    const expirationNum = jwtToken.value.exp;
 
     if (!expirationNum) {
       return false;
@@ -35,16 +29,23 @@ export const useAuthStore = defineStore('auth', () => {
   };
 
   const signInAsync = async (login: Login) => {
-    const response = await axios.post<JwtToken>(`${process.env.API_BASE_URL}/users/login`, login);
+    const response = await axios.post<JwtTokenResponse>(
+      `${process.env.API_BASE_URL}/users/login`,
+      login,
+    );
     tokenString.value = response.data.token;
   };
 
   const registerAsync = async (register: Register, registerToken: string) => {
-    const response = await axios.post<JwtToken>(`${process.env.API_BASE_URL}/users`, register, {
-      headers: {
-        Authorization: `Bearer ${registerToken}`,
+    const response = await axios.post<JwtTokenResponse>(
+      `${process.env.API_BASE_URL}/users`,
+      register,
+      {
+        headers: {
+          Authorization: `Bearer ${registerToken}`,
+        },
       },
-    });
+    );
     tokenString.value = response.data.token;
   };
 
@@ -52,40 +53,17 @@ export const useAuthStore = defineStore('auth', () => {
     tokenString.value = '';
   };
 
-  const userId = computed(() => {
-    const jwtPayload = jwtToken.payload.value;
+  const userId = computed(
+    () => jwtToken.value['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'],
+  );
 
-    if (jwtPayload == null) {
-      return null;
-    }
-
-    const payloadAny = jwtPayload as never;
-
-    return payloadAny[ClaimTypeUserId] as string;
-  });
-
-  const username = computed(() => {
-    const jwtPayload = jwtToken.payload.value;
-
-    if (jwtPayload == null) {
-      return null;
-    }
-
-    const payloadAny = jwtPayload as never;
-
-    return payloadAny[ClaimTypeUsername] as string;
-  });
+  const username = computed(
+    () => jwtToken.value['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'],
+  );
 
   const isAdmin = computed(() => {
-    const jwtPayload = jwtToken.payload.value;
-
-    if (jwtPayload == null) {
-      return null;
-    }
-
-    const payloadAny = jwtPayload as never;
-
-    const rolesClaim = payloadAny[ClaimTypeRoles] as string[];
+    const rolesClaim =
+      jwtToken.value['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
 
     return rolesClaim?.includes(RoleAdmin) == true;
   });
