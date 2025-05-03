@@ -3,8 +3,8 @@
 
   <!-- Compact footer with toggle button -->
   <q-footer elevated class="bg-grey-8 text-white q-pa-sm row justify-between items-center">
-    <div>Options</div>
-    <q-btn flat icon="tune" label="Filters" @click="showDrawer = true" />
+    <q-space />
+    <q-btn flat icon="tune" label="Settings" @click="showDrawer = true" />
   </q-footer>
 
   <!-- Bottom drawer with input fields -->
@@ -17,9 +17,12 @@
     class="bg-grey-9 text-white"
   >
     <div class="q-pa-md">
-      <div class="q-mb-md text-h6">Filter Settings</div>
+      <div class="q-mb-md text-h6">Settings</div>
       <div class="column q-gutter-md">
+        <SectionHeader label="Appearance" />
         <ColorInput v-model="ownColor" label="Own color" dense />
+
+        <SectionHeader label="Time range" />
         <DateTimePicker v-model="from" label="From" dense />
         <DateTimePicker v-model="to" label="To" dense />
       </div>
@@ -48,6 +51,7 @@ import { useAuthStore } from 'src/stores/authStore';
 import { computed, ref, useTemplateRef, watchEffect } from 'vue';
 import OtherUsersCard from 'src/components/map/OtherUsersCard.vue';
 import ColorInput from 'src/components/common/ColorInput.vue';
+import SectionHeader from 'src/components/common/SectionHeader.vue';
 
 const quasar = useQuasar();
 const { userId } = useAuthStore();
