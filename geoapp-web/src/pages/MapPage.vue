@@ -37,6 +37,7 @@
 import { useLocalStorage } from '@vueuse/core';
 import { date, useQuasar } from 'quasar';
 import { api } from 'src/boot/axios';
+import type { AxiosResponse } from 'axios';
 import axios from 'axios';
 import DateTimePicker from 'src/components/common/DateTimePicker.vue';
 import AddUserPopup from 'src/components/map/AddUserPopup.vue';
@@ -82,6 +83,41 @@ const onUserAdded = (user: OtherUserDataAllowance) => {
   allowedUsers.value.push(user);
 };
 
+const readDataAsync = async (abortController: AbortController) => {
+  const requests: { userId: string; promise: Promise<AxiosResponse<Datapoint[]>> }[] = [
+    // Add the current users data
+    {
+      userId,
+      promise: api.get<Datapoint[]>(`/data/${userId}`, {
+        params: { from: from.value, to: to.value },
+        signal: abortController.signal,
+      }),
+    },
+    // Add the allowed users data
+    ...allowedUsers.value.map((allowedUser) => ({
+      userId: allowedUser.userId,
+      promise: axios.get<Datapoint[]>(`${process.env.API_BASE_URL}/data/${allowedUser.userId}`, {
+        params: { from: from.value, to: to.value },
+        signal: abortController.signal,
+        headers: {
+          Authorization: `Bearer ${allowedUser.userReadToken}`,
+        },
+      }),
+    })),
+  ];
+
+  // Await the responses of all calls
+  const responses = await Promise.all(requests.map((r) => r.promise));
+
+  // Map the data
+  mapData.value = responses.map((r, idx) => ({
+    data: r.data.map((d) => {
+      return { lat: d.latitude, lng: d.longitude };
+    }),
+    userId: requests[idx]?.userId ?? '',
+  }));
+};
+
 watchEffect((onCleanup) => {
   quasar.loading.show({ delay: 100 });
 
@@ -91,50 +127,7 @@ watchEffect((onCleanup) => {
     controller.abort();
   });
 
-  mapData.value = [];
-
-  const promises = [];
-
-  // Read the own data
-  promises.push(
-    api
-      .get<Datapoint[]>(`/data/${userId}`, {
-        params: { from: from.value, to: to.value },
-        signal: controller.signal,
-      })
-      .then((axiosResponse) =>
-        mapData.value.push({
-          data: axiosResponse.data.map((d) => {
-            return { lat: d.latitude, lng: d.longitude };
-          }),
-          userId: userId,
-        }),
-      )
-      .catch((err) => console.error(err)),
-  );
-
-  allowedUsers.value
-    .map((allowedUser) =>
-      axios
-        .get<Datapoint[]>(`${process.env.API_BASE_URL}/data/${allowedUser.userId}`, {
-          params: { from: from.value, to: to.value },
-          signal: controller.signal,
-          headers: {
-            Authorization: `Bearer ${allowedUser.userReadToken}`,
-          },
-        })
-        .then((axiosResponse) =>
-          mapData.value.push({
-            data: axiosResponse.data.map((d) => {
-              return { lat: d.latitude, lng: d.longitude };
-            }),
-            userId: allowedUser.userId,
-          }),
-        )
-        .catch((err) => console.error(err)),
-    )
-    .forEach((p) => promises.push(p));
-  Promise.allSettled(promises)
+  readDataAsync(controller)
     .catch((err) => console.error(err))
     .finally(() => quasar.loading.hide());
 });

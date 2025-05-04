@@ -43,11 +43,13 @@ const zoom = useLocalStorage('map-zoom', 2);
 const center = useLocalStorage('map-center', { lat: 0, lng: 0 });
 
 const mapPoints = computed<MapPoint[]>(() =>
-  mapData.flatMap((d) =>
-    d.data.map((dp) => {
-      return { data: dp, userId: d.userId };
-    }),
-  ),
+  mapData
+    .flatMap((d) =>
+      d.data.map((dp) => {
+        return { data: dp, userId: d.userId };
+      }),
+    )
+    .reverse(),
 );
 </script>
 <style scoped>
